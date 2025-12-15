@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protocolo Geral - Repositório Institucional</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="ph ph-files-bold"></i>
+                <span>Protocolo<span class="highlight">Geral</span></span>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <i class="ph ph-squares-four"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-view="documentos">
+                    <i class="ph ph-folder-open"></i> Documentos
+                </a>
+                <a href="#" class="nav-item action-btn" id="btnNovoDocumento">
+                    <i class="ph ph-plus"></i> Novo Documento
+                </a>
+            </nav>
+
+            <div class="user-profile">
+                <div class="avatar">AD</div>
+                <div class="info">
+                    <span class="name">Administrador</span>
+                    <span class="role">Setor: Protocolo Geral</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h1 id="pageTitle">Visão Geral</h1>
+                <div class="search-box">
+                    <i class="ph ph-magnifying-glass"></i>
+                    <input type="text" id="globalSearch" placeholder="Buscar por protocolo, assunto...">
+                </div>
+            </header>
+
+            <div id="contentArea" class="content-wrapper">
+                <div class="loading-spinner">Carregando...</div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modalNovoDocumento" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Novo Documento</h2>
+                <button class="close-modal"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="formNovoDocumento">
+                <div class="form-group">
+                    <label>Assunto</label>
+                    <input type="text" name="assunto" required placeholder="Ex: Solicitação de Compra">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select name="tipo_documento" required>
+                            <option value="Ofício">Ofício</option>
+                            <option value="Processo">Processo</option>
+                            <option value="Memorando">Memorando</option>
+                            <option value="Requerimento">Requerimento</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Remetente</label>
+                        <input type="text" name="remetente" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Anexo (PDF)</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" name="arquivo_pdf" accept="application/pdf" id="inputFile" required>
+                        <span class="file-custom-label">Escolher arquivo...</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary close-modal">Cancelar</button>
+                    <button type="submit" class="btn-primary">Registrar Protocolo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalTramitar" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Tramitar Documento</h2>
+                <button class="close-modal"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="formTramitar">
+                <input type="hidden" name="documento_id" id="tramitarDocId">
+                <div class="form-group">
+                    <p class="info-text">Tramitando Protocolo: <strong id="tramitarProtocoloDisplay">...</strong></p>
+                </div>
+                <div class="form-group">
+                    <label>Setor de Destino</label>
+                    <select name="setor_destino_id" id="selectSetorDestino" required>
+                        </select>
+                </div>
+                <div class="form-group">
+                    <label>Despacho / Observações</label>
+                    <textarea name="despacho" rows="4" required placeholder="Descreva o motivo da tramitação..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary close-modal">Cancelar</button>
+                    <button type="submit" class="btn-primary">Confirmar Envio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden">Mensagem aqui</div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
