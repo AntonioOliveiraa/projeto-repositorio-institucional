@@ -1,0 +1,28 @@
+const express = require('express');
+const router = express.Router();
+const upload = require('../utils/uploadConfig');
+
+// Importação dos Controllers
+const documentoController = require('../controllers/documentoController');
+const tramitacaoController = require('../controllers/tramitacaoController');
+const auxiliarController = require('../controllers/auxiliarController');
+
+// --- Rotas de Documentos ---
+// POST /api/documentos - Cria documento com upload de PDF (RF-001)
+router.post('/documentos', upload.single('arquivo_pdf'), documentoController.criarDocumento);
+
+// GET /api/documentos - Lista com filtros (RF-001, RF-007)
+router.get('/documentos', documentoController.listarDocumentos);
+
+// GET /api/documentos/:id - Detalhes e Histórico (RF-001, RF-005)
+router.get('/documentos/:id', documentoController.obterDocumento);
+
+// --- Rotas de Tramitação ---
+// POST /api/tramitar - Movimentação entre setores (RF-004)
+router.post('/tramitar', tramitacaoController.tramitarDocumento);
+
+// --- Rotas Auxiliares ---
+router.get('/setores', auxiliarController.listarSetores);
+router.get('/usuarios', auxiliarController.listarUsuarios);
+
+module.exports = router;

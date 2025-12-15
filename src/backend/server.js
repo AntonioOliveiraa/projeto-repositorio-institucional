@@ -10,52 +10,62 @@ const PORT = 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend'))); // Serve arquivos estáticos
+app.use(express.urlencoded({ extended: true })); // Para parsear form-data sem arquivo
 
-// Conexão com Banco de Dados (SQLite File)
+// Servir PDFs da pasta de uploads
+app.use('/uploads', express.static(path.join(__dirname, '../../frontend/uploads'))); 
+
+// Servir arquivos estáticos do Frontend
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// --- Conexão Banco de Dados (Mantida da Parte 1) ---
 const dbPath = path.resolve(__dirname, '../../db/database.sqlite');
 const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Erro ao conectar ao banco de dados:', err.message);
-    } else {
-        console.log('Conectado ao banco de dados SQLite.');
-        initDb();
+    if (err) console.error('Erro DB:', err.message);
+    else {
+        console.log('Conectado ao SQLite.');
+        initDb(); // Função definida na Parte 1 (schema.sql)
     }
 });
 
-// Função para inicializar tabelas se não existirem
+// Exporta DB para ser usado nos controllers
+module.exports = db; 
+
+// --- IMPORTANTE: Importar Rotas DEPOIS do module.exports do db ---
+// (Isso evita dependência circular se o require for feito no topo sem o db estar pronto, 
+// mas no node.js o cache de require resolve isso. Por segurança, importamos aqui).
+const apiRoutes = require('./routes/apiRoutes');
+app.use('/api', apiRoutes);
+
+// Função initDb (Mantida da Parte 1 - certifique-se de que ela está aqui)
 function initDb() {
     const schemaPath = path.resolve(__dirname, '../../db/schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf8');
-    
-    db.exec(schema, (err) => {
-        if (err) console.error("Erro ao executar schema:", err);
-        else console.log("Tabelas verificadas/criadas com sucesso.");
-    });
-    
-    // Opcional: Rodar seeds se a tabela de usuários estiver vazia
-    db.get("SELECT count(*) as count FROM usuario", (err, row) => {
-        if (row && row.count === 0) {
-            const seedsPath = path.resolve(__dirname, '../../db/seeds.sql');
-            const seeds = fs.readFileSync(seedsPath, 'utf8');
-            db.exec(seeds, (err) => {
-                if (err) console.error("Erro nos seeds:", err);
-                else console.log("Dados iniciais inseridos.");
-            });
-        }
-    });
+    if (fs.existsSync(schemaPath)) {
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+        db.exec(schema, (err) => {
+            if (!err) {
+                 // Verifica seeds
+                 db.get("SELECT count(*) as count FROM usuario", (err, row) => {
+                    if (row && row.count === 0) {
+                        const seedsPath = path.resolve(__dirname, '../../db/seeds.sql');
+                        if (fs.existsSync(seedsPath)) {
+                            const seeds = fs.readFileSync(seedsPath, 'utf8');
+                            db.exec(seeds);
+                        }
+                    }
+                });
+            } else {
+                console.error("Erro ao inicializar DB:", err);
+            }
+        });
+    } else {
+        console.error("Schema.sql não encontrado em:", schemaPath);
+    }
 }
 
-// Rota de Teste (Health Check)
-app.get('/api/status', (req, res) => {
-    res.json({ status: 'Online', timestamp: new Date() });
-});
-
-// Iniciar Servidor
-app.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
-    console.log(`Documentação do projeto em: ${path.resolve(__dirname, '../../docs')}`);
-});
-
-// Exportar db para uso em outros arquivos (controllers)
-module.exports = db;
+// Iniciar servidor apenas se este arquivo for executado diretamente
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Servidor rodando em http://localhost:${PORT}`);
+    });
+}
