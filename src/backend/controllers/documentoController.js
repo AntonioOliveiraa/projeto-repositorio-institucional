@@ -12,19 +12,57 @@ const simularClassificacaoIA = (textoOuArquivo) => {
 
 exports.criarDocumento = async (req, res) => {
     try {
-        const { assunto, tipo_documento, remetente, setor_origem_id, usuario_id } = req.body;
+        const { 
+            categoria, // 'Servidor' ou 'Academico'
+            assunto,   // O item selecionado (ex: Licença, Trancamento)
+            
+            // Dados Comuns
+            requerente_nome,
+            requerente_cpf,
+            requerente_matricula,
+            requerente_email,
+            requerente_telefone,
+
+            // Dados Específicos (serão agrupados)
+            ...outrosDados
+        } = req.body;
+
         const caminho_anexo = req.file ? `/uploads/${req.file.filename}` : null;
+        
+        // Separa os dados específicos para salvar como JSON
+        // Remove campos que já foram tratados ou são de controle
+        const camposIgnorar = ['setor_origem_id', 'usuario_id'];
+        const dadosExtrasObj = {};
+        
+        Object.keys(outrosDados).forEach(key => {
+            if (!camposIgnorar.includes(key)) {
+                dadosExtrasObj[key] = outrosDados[key];
+            }
+        });
+
+        const dados_extras = JSON.stringify(dadosExtrasObj);
 
         // 1. Gerar Protocolo Único (RF-002)
         const protocolo = await gerarProtocolo();
 
         // 2. Inserir Documento
         const sqlDoc = `
-            INSERT INTO documento (numero_protocolo, assunto, tipo_documento, remetente, caminho_anexo, setor_atual_id, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'Recebido')
+            INSERT INTO documento (
+                numero_protocolo, categoria, assunto, 
+                requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone,
+                dados_extras, caminho_anexo, setor_atual_id, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Recebido')
         `;
 
-        db.run(sqlDoc, [protocolo, assunto, tipo_documento, remetente, caminho_anexo, setor_origem_id], function(err) {
+        // Assumindo setor_origem_id padrão = 1 (Protocolo Geral) se não vier
+        const setor_origem_id = req.body.setor_origem_id || 1; 
+
+        db.run(sqlDoc, [
+            protocolo, categoria, assunto,
+            requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone,
+            dados_extras, caminho_anexo, setor_origem_id
+        ], function(err) {
             if (err) return res.status(500).json({ erro: err.message });
             
             const documentoId = this.lastID;
@@ -32,19 +70,19 @@ exports.criarDocumento = async (req, res) => {
             // 3. Registrar Tramitação Inicial (Criação) - Histórico (RF-005)
             const sqlTramite = `
                 INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho)
-                VALUES (?, ?, ?, ?, 'Documento cadastrado no sistema.')
+                VALUES (?, ?, ?, ?, 'Abertura de Protocolo - ' + ?)
             `;
-            // Assumindo que na criação, origem = destino
-            db.run(sqlTramite, [documentoId, setor_origem_id, setor_origem_id, usuario_id], (err) => {
-                if(err) console.error("Erro ao criar histórico inicial:", err);
+            const usuario_id = req.body.usuario_id || 1;
+            
+            db.run(sqlTramite, [documentoId, setor_origem_id, setor_origem_id, usuario_id, categoria], (err) => {
+                if(err) console.error("Erro histórico inicial:", err);
             });
 
             // 4. Classificação Automática (IA) (RF-008)
             const tagsSugeridas = simularClassificacaoIA(assunto);
-            // Aqui salvaríamos na tabela documento_tag (simplificado para resposta)
-            
+
             res.status(201).json({ 
-                mensagem: "Documento criado com sucesso", 
+                mensagem: "Documento registrado com sucesso", 
                 protocolo: protocolo,
                 id: documentoId,
                 tags_ia: tagsSugeridas
@@ -52,18 +90,19 @@ exports.criarDocumento = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({ erro: "Erro interno ao gerar protocolo." });
+        res.status(500).json({ erro: "Erro interno no servidor." });
     }
 };
 
 exports.listarDocumentos = (req, res) => {
     // RF-001 e RF-007 (Filtros)
-    const { status, setor_atual_id, busca } = req.query;
+    const { status, categoria, busca } = req.query;
+    
     let sql = `
         SELECT d.*, s.nome as nome_setor_atual 
         FROM documento d
         LEFT JOIN setor s ON d.setor_atual_id = s.id
-        WHERE d.status != 'Arquivado' -- Exclusão lógica (RF-001)
+        WHERE d.status != 'Arquivado'
     `;
     
     const params = [];
@@ -72,12 +111,12 @@ exports.listarDocumentos = (req, res) => {
         sql += " AND d.status = ?";
         params.push(status);
     }
-    if (setor_atual_id) {
-        sql += " AND d.setor_atual_id = ?";
-        params.push(setor_atual_id);
+    if (categoria) {
+        sql += " AND d.categoria = ?";
+        params.push(categoria);
     }
     if (busca) {
-        sql += " AND (d.numero_protocolo LIKE ? OR d.assunto LIKE ? OR d.remetente LIKE ?)";
+        sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ?)";
         const termo = `%${busca}%`;
         params.push(termo, termo, termo);
     }
@@ -110,9 +149,13 @@ exports.obterDocumento = (req, res) => {
     db.get(sqlDoc, [id], (err, doc) => {
         if (err || !doc) return res.status(404).json({ erro: "Documento não encontrado" });
 
+        // Parse do JSON de dados extras para devolver como objeto
+        if(doc.dados_extras) {
+            try { doc.dados_extras = JSON.parse(doc.dados_extras); } catch(e) {}
+        }
+
         db.all(sqlHist, [id], (errHist, historico) => {
             if (errHist) return res.status(500).json({ erro: "Erro ao buscar histórico" });
-            
             res.json({ ...doc, historico });
         });
     });

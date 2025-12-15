@@ -24,9 +24,23 @@ CREATE TABLE IF NOT EXISTS usuario (
 CREATE TABLE IF NOT EXISTS documento (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     numero_protocolo TEXT NOT NULL UNIQUE, -- RF-002 [cite: 56]
-    assunto TEXT NOT NULL,
-    tipo_documento TEXT NOT NULL,
-    remetente TEXT NOT NULL,
+    
+    -- Categoria do Processo (Servidor ou Acadêmico)
+    categoria TEXT NOT NULL CHECK(categoria IN ('Servidor', 'Academico')), 
+    
+    -- Dados Comuns do Requerente
+    requerente_nome TEXT NOT NULL,
+    requerente_cpf TEXT NOT NULL,
+    requerente_matricula TEXT,
+    requerente_email TEXT,
+    requerente_telefone TEXT,
+    
+    -- O "Assunto" agora é o tipo de solicitação (ex: "Licença Prêmio", "Trancamento")
+    assunto TEXT NOT NULL, 
+    
+    -- Armazena dados específicos em formato JSON (ex: Curso/Polo para aluno, Cargo/Lotação para servidor)
+    dados_extras TEXT, 
+
     data_recebimento DATETIME DEFAULT CURRENT_TIMESTAMP,
     status TEXT NOT NULL DEFAULT 'Recebido', -- RF-003 [cite: 58]
     caminho_anexo TEXT, -- Caminho do PDF
