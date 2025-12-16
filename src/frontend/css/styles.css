@@ -177,78 +177,57 @@ body {
 
 /* --- Botões de Ícone (Ações e Fechar) --- */
 
-/* Base para todos os botões de ícone */
-.btn-icon, .close-modal, .close-custom {
+/* Base para botões de ícone (X e Ações da Tabela) 
+   EXCETO o botão 'Cancelar' (que tem a classe .btn-secondary) */
+.btn-icon, .close-custom, .close-modal:not(.btn-secondary) {
     background: transparent;
     border: none;
     cursor: pointer;
     padding: 8px;
-    border-radius: 50%; /* Formato circular ao passar o mouse */
+    border-radius: 50%; /* Bolinha */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: var(--text-muted);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); /* Transição suave */
-    font-size: 1.25rem; /* Tamanho padrão do ícone */
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1.25rem;
 }
 
-/* Efeito Hover Geral */
-.btn-icon:hover, .close-modal:hover, .close-custom:hover {
-    background-color: #f1f5f9; /* Cinza bem claro */
-    transform: translateY(-2px); /* Leve elevação */
+/* Hover Geral */
+.btn-icon:hover, .close-custom:hover, .close-modal:not(.btn-secondary):hover {
+    background-color: #f1f5f9;
+    transform: translateY(-2px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-/* Efeito de Clique (Active) */
-.btn-icon:active, .close-modal:active {
-    transform: translateY(0);
-}
-
-/* --- Cores Específicas por Ação (Hover) --- */
-
-/* Botão Ver (Olho) - Azul */
-.btn-ver:hover {
-    color: var(--primary-color);
-    background-color: #eff6ff; /* Azul bem claro */
-}
-
-/* Botão Editar (Lápis) - Amarelo/Laranja */
-.btn-editar:hover {
-    color: #d97706;
-    background-color: #fffbeb;
-}
-
-/* Botão Tramitar (Avião) - Verde */
-.btn-tramitar:hover {
-    color: #059669;
-    background-color: #ecfdf5;
-}
-
-/* Botão Arquivar (Lixeira) - Vermelho */
-.btn-arquivar:hover {
-    color: var(--danger);
-    background-color: #fef2f2;
-}
+/* --- Cores Específicas (Hover) --- */
+.btn-ver:hover { color: var(--primary-color); background-color: #eff6ff; }
+.btn-editar:hover { color: #d97706; background-color: #fffbeb; }
+.btn-tramitar:hover { color: #059669; background-color: #ecfdf5; }
+.btn-arquivar:hover { color: var(--danger); background-color: #fef2f2; }
 
 /* --- Botão de Fechar Modal (X) --- */
-.close-modal, .close-custom {
-    font-size: 1.5rem; /* Um pouco maior que os outros */
+/* Aplica posição absoluta APENAS ao X, ignorando o Cancelar */
+.close-custom, .close-modal:not(.btn-secondary) {
+    font-size: 1.5rem;
     color: #94a3b8;
-    position: absolute; /* Garante posicionamento no canto */
+    position: absolute; /* Fixa no canto do .modal-card */
     top: 1rem;
     right: 1rem;
+    z-index: 10; /* Garante que fique sobre o header */
 }
 
-.close-modal:hover, .close-custom:hover {
+/* Hover específico do X */
+.close-custom:hover, .close-modal:not(.btn-secondary):hover {
     color: var(--danger);
     background-color: #fee2e2;
-    transform: rotate(90deg); /* Pequena rotação charmosa ao passar o mouse */
+    transform: rotate(90deg);
 }
 
-/* Ajuste para a coluna de ações na tabela para alinhar os botões */
+/* Ajuste para alinhar ícones na tabela */
 .acoes-col {
     display: flex;
-    gap: 0.25rem; /* Espaçamento entre os botões */
+    gap: 0.25rem;
     align-items: center;
 }
 
@@ -274,6 +253,7 @@ body {
     width: 500px; /* Largura padrão, pode ser sobrescrita via style inline no HTML */
     max-width: 100%;
     box-shadow: var(--shadow-md);
+    position: relative;
 
     /* (RF-UX) */
     max-height: 90vh;       /* Limita a altura a 90% da tela */
