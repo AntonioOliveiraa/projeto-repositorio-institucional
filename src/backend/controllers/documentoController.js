@@ -74,18 +74,16 @@ exports.criarDocumento = async (req, res) => {
                 VALUES (?, ?, ?, ?, 'Abertura de Protocolo - ' + ?)
             `;
             
-            db.run(sqlTramite, [documentoId, setor_origem_id, setor_origem_id, usuario_id, categoria], (err) => {
-                if(err) console.error("Erro histórico inicial:", err);
-            });
+            db.run(sqlTramite, [documentoId, setor_origem_id, setor_origem_id, usuario_id, categoria], (err) => { if(err) console.error("Erro histórico inicial:", err); });
 
             // 4. Classificação Automática (IA) (RF-008)
             const tagsSugeridas = simularClassificacaoIA(assunto);
 
             res.status(201).json({ 
                 mensagem: "Documento registrado com sucesso", 
-                protocolo: protocolo,
-                id: documentoId,
-                tags_ia: tagsSugeridas
+                protocolo: protocolo, 
+                id: documentoId, 
+                tags_ia: tagsSugeridas 
             });
         });
 
@@ -115,9 +113,9 @@ exports.listarDocumentos = (req, res) => {
         sql += " AND d.categoria = ?";
         params.push(categoria);
     }
-    // --- CORREÇÃO DA BUSCA GLOBAL ---
+    // --- CORREÇÃO: Busca Abrangente ---
     if (busca) {
-        // Agora busca também no Assunto e nos Dados Extras (JSON)
+        // Pesquisa em Protocolo, Nome, CPF, Assunto e JSON de Dados Extras
         sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ? OR d.assunto LIKE ? OR d.dados_extras LIKE ?)";
         const termo = `%${busca}%`;
         params.push(termo, termo, termo, termo, termo);
