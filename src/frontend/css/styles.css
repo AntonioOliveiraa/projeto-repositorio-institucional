@@ -246,3 +246,24 @@ body {
 }
 .stat-info h3 { font-size: 1.5rem; margin-bottom: 0.25rem; }
 .stat-info p { color: var(--text-muted); font-size: 0.875rem; }
+
+/* --- Utilitários --- */
+.hidden {
+    display: none !important; /* O !important garante que sobrescreva outros estilos */
+}
+
+/* Ajuste Fino do Dropdown de Notificações */
+.notification-dropdown {
+    transform-origin: top right;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Estilo para itens de notificação (hover) */
+.notif-item:hover {
+    background-color: #f8fafc;
+}
