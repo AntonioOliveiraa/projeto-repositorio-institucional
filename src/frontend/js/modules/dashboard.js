@@ -5,9 +5,17 @@ export async function initDashboard() {
     contentArea.innerHTML = '<div class="loading-spinner">Carregando indicadores...</div>';
 
     try {
-        const docs = await API.get('/documentos');
+        // Busca todos os documentos (limite alto para estatísticas)
+        const response = await API.get('/documentos?limit=10000');
+        const docs = response.data || []; // Garante que seja um array
 
-        // Renderização do HTML do Dashboard com FILTROS DE DATA (RF-010)
+        // Cálculos estatísticos no frontend
+        const total = docs.length;
+        const recebidos = docs.filter(d => d.status === 'Recebido').length;
+        const analise = docs.filter(d => d.status === 'Em Análise').length;
+        const finalizados = docs.filter(d => d.status === 'Finalizado').length;
+
+        // Renderização do HTML do Dashboard
         contentArea.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2rem; flex-wrap:wrap; gap:10px;">
                 <h2>Painel de Controle</h2>
@@ -30,19 +38,31 @@ export async function initDashboard() {
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon" style="background:#eff6ff; color:#2563eb"><i class="ph ph-files"></i></div>
-                    <div class="stat-info"><h3>${docs.length}</h3><p>Total Ativos</p></div>
+                    <div class="stat-info">
+                        <h3>${total}</h3>
+                        <p>Total Ativos</p>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon" style="background:#fff7ed; color:#ea580c"><i class="ph ph-hourglass"></i></div>
-                    <div class="stat-info"><h3>${docs.filter(d=>d.status==='Em Análise').length}</h3><p>Em Análise</p></div>
+                    <div class="stat-info">
+                        <h3>${analise}</h3>
+                        <p>Em Análise</p>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon" style="background:#f0fdf4; color:#16a34a"><i class="ph ph-check-circle"></i></div>
-                    <div class="stat-info"><h3>${docs.filter(d=>d.status==='Finalizado').length}</h3><p>Finalizados</p></div>
+                    <div class="stat-info">
+                        <h3>${finalizados}</h3>
+                        <p>Finalizados</p>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon" style="background:#f8fafc; color:#64748b"><i class="ph ph-tray"></i></div>
-                    <div class="stat-info"><h3>${docs.filter(d=>d.status==='Recebido').length}</h3><p>Novos</p></div>
+                    <div class="stat-info">
+                        <h3>${recebidos}</h3>
+                        <p>Novos (Recebido)</p>
+                    </div>
                 </div>
             </div>
 
@@ -50,12 +70,13 @@ export async function initDashboard() {
             <div id="dashboardRecentTable"></div>
         `;
         
-        // Tabela Recentes (Top 5)
+        // Renderiza tabela simplificada (Top 5)
+        const recentes = docs.slice(0, 5); 
         const tabelaHtml = `
             <table class="card-table">
                 <thead><tr><th>Protocolo</th><th>Assunto</th><th>Requerente</th><th>Status</th></tr></thead>
                 <tbody>
-                    ${docs.slice(0, 5).map(d => `
+                    ${recentes.map(d => `
                         <tr>
                             <td style="font-weight:bold;">${d.numero_protocolo}</td>
                             <td>${d.assunto}</td>
@@ -68,7 +89,7 @@ export async function initDashboard() {
         `;
         document.getElementById('dashboardRecentTable').innerHTML = tabelaHtml;
 
-        // Lógica do Botão de Relatório com Filtro
+        // Adiciona evento ao botão de relatório com filtro de data
         document.getElementById('btnRelatorioGerencial').addEventListener('click', () => {
             const inicio = document.getElementById('relDataInicio').value;
             const fim = document.getElementById('relDataFim').value;
@@ -80,7 +101,7 @@ export async function initDashboard() {
             if (inicio || fim) {
                 const dataInicio = inicio ? new Date(inicio) : new Date('1900-01-01');
                 const dataFim = fim ? new Date(fim) : new Date();
-                if(fim) dataFim.setHours(23,59,59); // Incluir o dia final inteiro
+                if(fim) dataFim.setHours(23,59,59); // Fim do dia
 
                 docsFiltrados = docs.filter(d => {
                     const dataDoc = new Date(d.data_recebimento);
@@ -90,7 +111,7 @@ export async function initDashboard() {
                 periodoTexto = `Período: ${inicio ? new Date(inicio).toLocaleDateString() : 'Início'} até ${fim ? new Date(fim).toLocaleDateString() : 'Hoje'}`;
             }
 
-            // Recalcula estatísticas baseadas no filtro
+            // Recalcula estatísticas para o PDF
             const stats = {
                 total: docsFiltrados.length,
                 recebidos: docsFiltrados.filter(d => d.status === 'Recebido').length,
@@ -121,14 +142,16 @@ function getStatusClass(status) {
     return '';
 }
 
+// --- Função que gera o Relatório PDF ---
 function gerarRelatorioPDF(dados) {
     const { total, recebidos, analise, finalizados, docs, periodo } = dados;
     const dataHora = new Date().toLocaleString();
 
+    // Lista para o PDF (limite de 50 para não quebrar muitas páginas)
     const listaRecentes = docs.slice(0, 50).map(d => `
         <tr>
             <td>${d.numero_protocolo}</td>
-            <td>${new Date(d.data_recebimento).toLocaleDateString()}</td>
+            <td>${d.data_recebimento ? new Date(d.data_recebimento).toLocaleDateString() : '-'}</td>
             <td>${d.categoria}</td>
             <td>${d.assunto}</td>
             <td>${d.requerente_nome}</td>
@@ -142,42 +165,103 @@ function gerarRelatorioPDF(dados) {
     <head>
         <title>Relatório Gerencial</title>
         <style>
-            body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #333; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; max-width: 100%; }
+            
             .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
-            .header h1 { margin: 0; font-size: 24px; color: #2563eb; text-transform: uppercase; }
+            .header h1 { margin: 0; font-size: 24px; color: #2563eb; text-transform: uppercase; letter-spacing: 1px; }
+            .header p { margin: 5px 0 0; font-size: 14px; color: #666; }
+            
             .summary-box { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 40px; }
             .card { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 8px; text-align: center; background: #f8fafc; }
             .card-num { font-size: 32px; font-weight: bold; color: #2563eb; margin: 10px 0; }
+            .card-label { font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; }
+
+            .table-container { margin-bottom: 30px; }
+            .section-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; border-left: 5px solid #2563eb; padding-left: 10px; color: #1e293b; }
+            
             table { width: 100%; border-collapse: collapse; font-size: 11px; }
-            th { background: #e2e8f0; text-align: left; padding: 10px 8px; border-bottom: 2px solid #94a3b8; }
+            th { background: #e2e8f0; text-align: left; padding: 10px 8px; border-bottom: 2px solid #94a3b8; font-weight: bold; text-transform: uppercase; }
             td { border-bottom: 1px solid #e2e8f0; padding: 8px; }
             tr:nth-child(even) { background-color: #f8fafc; }
+
             .footer { margin-top: 50px; text-align: center; font-size: 10px; border-top: 1px solid #ccc; padding-top: 20px; color: #999; }
+            
+            .signature-area { margin-top: 80px; display: flex; justify-content: space-around; page-break-inside: avoid; }
+            .signature-line { width: 40%; border-top: 1px solid #000; text-align: center; padding-top: 10px; font-weight: bold; font-size: 12px; }
+            
+            @media print {
+                body { padding: 0; }
+                .card { border: 1px solid #000; }
+                th { background: #ccc !important; -webkit-print-color-adjust: exact; }
+            }
         </style>
     </head>
     <body>
         <div class="header">
             <h1>Relatório Gerencial de Protocolo</h1>
-            <p>${periodo}</p>
+            <p>Repositório Institucional - Módulo de Gestão</p>
+            <p><strong>${periodo}</strong></p>
             <p><strong>Gerado em:</strong> ${dataHora}</p>
         </div>
 
-        <div style="font-weight:bold; margin-bottom:10px;">Resumo Quantitativo do Período</div>
+        <div class="section-title">Resumo Quantitativo</div>
         <div class="summary-box">
-            <div class="card"><div style="font-size:12px;">Total</div><div class="card-num">${total}</div></div>
-            <div class="card"><div style="font-size:12px;">Novos</div><div class="card-num">${recebidos}</div></div>
-            <div class="card"><div style="font-size:12px;">Em Análise</div><div class="card-num">${analise}</div></div>
-            <div class="card"><div style="font-size:12px;">Finalizados</div><div class="card-num">${finalizados}</div></div>
+            <div class="card">
+                <div class="card-label">Total</div>
+                <div class="card-num">${total}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Novos</div>
+                <div class="card-num">${recebidos}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Em Análise</div>
+                <div class="card-num">${analise}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Finalizados</div>
+                <div class="card-num">${finalizados}</div>
+            </div>
         </div>
 
-        <div style="font-weight:bold; margin-bottom:10px;">Detalhamento (Até 50 registros)</div>
-        <table>
-            <thead><tr><th>Protocolo</th><th>Data</th><th>Categoria</th><th>Assunto</th><th>Requerente</th><th>Setor</th><th>Status</th></tr></thead>
-            <tbody>${listaRecentes}</tbody>
-        </table>
+        <div class="table-container">
+            <div class="section-title">Listagem de Protocolos (Amostra)</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Protocolo</th>
+                        <th>Data</th>
+                        <th>Categoria</th>
+                        <th>Assunto</th>
+                        <th>Requerente</th>
+                        <th>Setor Atual</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${listaRecentes}
+                </tbody>
+            </table>
+        </div>
 
-        <div class="footer"><p>Sistema de Protocolo Geral - Documento Oficial</p></div>
-        <script>window.print();</script>
+        <div class="signature-area">
+            <div class="signature-line">
+                Responsável pelo Setor
+                <br><span style="font-weight:normal; font-size:10px;">Assinatura / Carimbo</span>
+            </div>
+            <div class="signature-line">
+                Gestão Administrativa
+                <br><span style="font-weight:normal; font-size:10px;">Visto de Conferência</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Relatório gerado automaticamente pelo Sistema de Protocolo Geral.</p>
+        </div>
+
+        <script>
+            window.print();
+        </script>
     </body>
     </html>
     `;
