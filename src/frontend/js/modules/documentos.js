@@ -92,6 +92,11 @@ async function abrirModalEdicao(id) {
         if (doc.dados_extras) {
             // doc.dados_extras já é objeto (parseado no controller)
             for (const [key, value] of Object.entries(doc.dados_extras)) {
+                
+                // --- PROTEÇÃO CONTRA CAMPOS VAZIOS OU INDESEJADOS ---
+                // Se o valor for vazio, nulo ou se a chave for um campo de controle antigo
+                if (!value || value.trim() === '' || key.startsWith('assunto_')) continue;
+                
                 const label = key.charAt(0).toUpperCase() + key.slice(1);
                 container.innerHTML += `
                     <div class="form-group">

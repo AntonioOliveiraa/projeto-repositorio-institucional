@@ -3,11 +3,9 @@ const gerarProtocolo = require('../utils/protocoloGenerator');
 
 // Simulação da IA para RF-008 [cite: 75-77]
 // Em produção, isso chamaria uma API real (ex: OpenAI/Gemini)
-const simularClassificacaoIA = (textoOuArquivo) => {
-    const tagsPossiveis = ['Financeiro', 'Administrativo', 'Urgente', 'Jurídico', 'RH', 'Contrato'];
-    // Retorna 3 tags aleatórias
-    const shuffled = tagsPossiveis.sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 3);
+const simularClassificacaoIA = (texto) => {
+    const tags = ['Urgente', 'Administrativo', 'Análise Técnica', 'Deferimento', 'Indeferimento'];
+    return tags.sort(() => 0.5 - Math.random()).slice(0, 3);
 };
 
 exports.criarDocumento = async (req, res) => {
@@ -21,26 +19,28 @@ exports.criarDocumento = async (req, res) => {
             requerente_cpf,
             requerente_matricula,
             requerente_email,
-            requerente_telefone,
-
-            // Dados Específicos (serão agrupados)
-            ...outrosDados
+            requerente_telefone
         } = req.body;
 
         const caminho_anexo = req.file ? `/uploads/${req.file.filename}` : null;
         
-        // Separa os dados específicos para salvar como JSON
-        // Remove campos que já foram tratados ou são de controle
-        const camposIgnorar = ['setor_origem_id', 'usuario_id'];
+        // Filtro de Dados Extras por Categoria
+        // Em vez de pegar tudo, pegamos apenas o que pertence à categoria
         const dadosExtrasObj = {};
-        
-        Object.keys(outrosDados).forEach(key => {
-            if (!camposIgnorar.includes(key)) {
-                dadosExtrasObj[key] = outrosDados[key];
-            }
-        });
 
+        if (categoria === 'Servidor') {
+            // Campos específicos de Servidor
+            if (req.body.cargo) dadosExtrasObj.cargo = req.body.cargo;
+            if (req.body.lotacao) dadosExtrasObj.lotacao = req.body.lotacao;
+        } else if (categoria === 'Academico') {
+            // Campos específicos de Acadêmico
+            if (req.body.curso) dadosExtrasObj.curso = req.body.curso;
+            if (req.body.centro) dadosExtrasObj.centro = req.body.centro;
+            if (req.body.programa) dadosExtrasObj.programa = req.body.programa;
+        }
+        
         const dados_extras = JSON.stringify(dadosExtrasObj);
+        // -----------------------------------------------------
 
         // 1. Gerar Protocolo Único (RF-002)
         const protocolo = await gerarProtocolo();
@@ -57,6 +57,7 @@ exports.criarDocumento = async (req, res) => {
 
         // Assumindo setor_origem_id padrão = 1 (Protocolo Geral) se não vier
         const setor_origem_id = req.usuario.setor_id; 
+        const usuario_id = req.usuario.id;
 
         db.run(sqlDoc, [
             protocolo, categoria, assunto,
@@ -72,7 +73,6 @@ exports.criarDocumento = async (req, res) => {
                 INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho)
                 VALUES (?, ?, ?, ?, 'Abertura de Protocolo - ' + ?)
             `;
-            const usuario_id = req.usuario.id;
             
             db.run(sqlTramite, [documentoId, setor_origem_id, setor_origem_id, usuario_id, categoria], (err) => {
                 if(err) console.error("Erro histórico inicial:", err);
@@ -90,6 +90,7 @@ exports.criarDocumento = async (req, res) => {
         });
 
     } catch (error) {
+        console.error(error);
         res.status(500).json({ erro: "Erro interno no servidor." });
     }
 };
@@ -97,32 +98,12 @@ exports.criarDocumento = async (req, res) => {
 exports.listarDocumentos = (req, res) => {
     // RF-001 e RF-007 (Filtros)
     const { status, categoria, busca } = req.query;
-    
-    let sql = `
-        SELECT d.*, s.nome as nome_setor_atual 
-        FROM documento d
-        LEFT JOIN setor s ON d.setor_atual_id = s.id
-        WHERE d.status != 'Arquivado'
-    `;
-    
+    let sql = `SELECT d.*, s.nome as nome_setor_atual FROM documento d LEFT JOIN setor s ON d.setor_atual_id = s.id WHERE d.status != 'Arquivado'`;
     const params = [];
-
-    if (status) {
-        sql += " AND d.status = ?";
-        params.push(status);
-    }
-    if (categoria) {
-        sql += " AND d.categoria = ?";
-        params.push(categoria);
-    }
-    if (busca) {
-        sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ?)";
-        const termo = `%${busca}%`;
-        params.push(termo, termo, termo);
-    }
-
+    if (status) { sql += " AND d.status = ?"; params.push(status); }
+    if (categoria) { sql += " AND d.categoria = ?"; params.push(categoria); }
+    if (busca) { sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ?)"; const termo = `%${busca}%`; params.push(termo, termo, termo); }
     sql += " ORDER BY d.id DESC";
-
     db.all(sql, params, (err, rows) => {
         if (err) return res.status(500).json({ erro: err.message });
         res.json(rows);
@@ -148,12 +129,7 @@ exports.obterDocumento = (req, res) => {
 
     db.get(sqlDoc, [id], (err, doc) => {
         if (err || !doc) return res.status(404).json({ erro: "Documento não encontrado" });
-
-        // Parse do JSON de dados extras para devolver como objeto
-        if(doc.dados_extras) {
-            try { doc.dados_extras = JSON.parse(doc.dados_extras); } catch(e) {}
-        }
-
+        if(doc.dados_extras) { try { doc.dados_extras = JSON.parse(doc.dados_extras); } catch(e) {} }
         db.all(sqlHist, [id], (errHist, historico) => {
             if (errHist) return res.status(500).json({ erro: "Erro ao buscar histórico" });
             res.json({ ...doc, historico });
@@ -164,23 +140,12 @@ exports.obterDocumento = (req, res) => {
 exports.editarDocumento = (req, res) => {
     const { id } = req.params;
     const { requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dados_extras } = req.body;
-
-    // Proteção: Não permitimos editar numero_protocolo, status ou ids de chave estrangeira diretamente aqui
-    const sql = `
-        UPDATE documento 
-        SET requerente_nome = ?, requerente_cpf = ?, requerente_matricula = ?, 
-            requerente_email = ?, requerente_telefone = ?, assunto = ?, dados_extras = ?
-        WHERE id = ?
-    `;
-
-    // Se dados_extras for um objeto, converte para string
+    const sql = `UPDATE documento SET requerente_nome = ?, requerente_cpf = ?, requerente_matricula = ?, requerente_email = ?, requerente_telefone = ?, assunto = ?, dados_extras = ? WHERE id = ?`;
     const dadosExtrasStr = typeof dados_extras === 'object' ? JSON.stringify(dados_extras) : dados_extras;
-
     db.run(sql, [requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dadosExtrasStr, id], function(err) {
-        if (err) return res.status(500).json({ erro: "Erro ao editar documento: " + err.message });
+        if (err) return res.status(500).json({ erro: err.message });
         if (this.changes === 0) return res.status(404).json({ erro: "Documento não encontrado." });
-        
-        res.json({ mensagem: "Documento atualizado com sucesso." });
+        res.json({ mensagem: "Atualizado com sucesso." });
     });
 };
 
@@ -202,12 +167,8 @@ exports.arquivarDocumento = (req, res) => {
         db.run(sqlUpdate, [id], function(err) {
             if (err) return res.status(500).json({ erro: "Erro ao arquivar." });
             if (this.changes === 0) return res.status(404).json({ erro: "Documento não encontrado." });
-
-            db.run(sqlTramite, [usuario_id, id], (errT) => {
-                if (errT) console.error("Erro ao registrar histórico de arquivamento", errT);
-            });
-
-            res.json({ mensagem: "Documento arquivado com sucesso." });
+            db.run(sqlTramite, [usuario_id, id]);
+            res.json({ mensagem: "Arquivado com sucesso." });
         });
     });
 };
