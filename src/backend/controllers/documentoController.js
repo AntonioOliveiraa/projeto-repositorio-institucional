@@ -86,11 +86,7 @@ exports.criarDocumento = async (req, res) => {
                 tags_ia: tagsSugeridas 
             });
         });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ erro: "Erro interno no servidor." });
-    }
+    } catch (error) { res.status(500).json({ erro: "Erro interno." }); }
 };
 
 exports.listarDocumentos = (req, res) => {
@@ -113,7 +109,7 @@ exports.listarDocumentos = (req, res) => {
         sql += " AND d.categoria = ?";
         params.push(categoria);
     }
-    // --- CORREÇÃO: Busca Abrangente ---
+    // --- Busca Abrangente ---
     if (busca) {
         // Pesquisa em Protocolo, Nome, CPF, Assunto e JSON de Dados Extras
         sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ? OR d.assunto LIKE ? OR d.dados_extras LIKE ?)";
@@ -135,27 +131,77 @@ exports.obterDocumento = (req, res) => {
     // Busca dados do documento
     const sqlDoc = `SELECT d.*, s.nome as setor_nome FROM documento d JOIN setor s ON d.setor_atual_id = s.id WHERE d.id = ?`;
     
-    // Busca histórico de tramitação (RF-005)
-    const sqlHist = `
-        SELECT t.*, so.nome as setor_origem, sd.nome as setor_destino, u.nome as usuario_nome
-        FROM tramitacao t
-        JOIN setor so ON t.setor_origem_id = so.id
-        JOIN setor sd ON t.setor_destino_id = sd.id
-        JOIN usuario u ON t.usuario_id = u.id
-        WHERE t.documento_id = ?
-        ORDER BY t.data_hora DESC
-    `;
+    // Busca anexos relacionados
+    const sqlAnexos = `SELECT * FROM anexo WHERE documento_id = ? ORDER BY data_upload DESC`;
+    
+    const sqlHist = `SELECT t.*, so.nome as setor_origem, sd.nome as setor_destino, u.nome as usuario_nome FROM tramitacao t JOIN setor so ON t.setor_origem_id = so.id JOIN setor sd ON t.setor_destino_id = sd.id JOIN usuario u ON t.usuario_id = u.id WHERE t.documento_id = ? ORDER BY t.data_hora DESC`;
 
     db.get(sqlDoc, [id], (err, doc) => {
-        if (err || !doc) return res.status(404).json({ erro: "Documento não encontrado" });
+        if (err || !doc) return res.status(404).json({ erro: "Não encontrado" });
         if(doc.dados_extras) { try { doc.dados_extras = JSON.parse(doc.dados_extras); } catch(e) {} }
-        db.all(sqlHist, [id], (errHist, historico) => {
-            if (errHist) return res.status(500).json({ erro: "Erro ao buscar histórico" });
-            res.json({ ...doc, historico });
+        
+        db.all(sqlAnexos, [id], (errAnx, anexos) => {
+            db.all(sqlHist, [id], (errHist, historico) => {
+                res.json({ ...doc, anexos: anexos || [], historico: historico || [] });
+            });
         });
     });
 };
 
+exports.anexarArquivo = (req, res) => {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ erro: "Nenhum arquivo enviado." });
+    
+    const caminho = `/uploads/${req.file.filename}`;
+    const nome_original = req.file.originalname;
+    const usuario_id = req.usuario.id;
+
+    const sql = `INSERT INTO anexo (documento_id, nome_arquivo, caminho, usuario_id) VALUES (?, ?, ?, ?)`;
+    
+    db.run(sql, [id, nome_original, caminho, usuario_id], function(err) {
+        if (err) return res.status(500).json({ erro: err.message });
+        
+        // Opcional: Registrar no histórico que houve um anexo
+        const sqlHist = `INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho) SELECT setor_atual_id, setor_atual_id, setor_atual_id, ?, 'Novo anexo adicionado: ' || ? FROM documento WHERE id = ?`;
+        db.run(sqlHist, [usuario_id, nome_original, id]);
+
+        res.json({ mensagem: "Arquivo anexado com sucesso." });
+    });
+};
+
+exports.finalizarDocumento = (req, res) => {
+    const { id } = req.params;
+    const { decisao, texto_conclusao } = req.body; // decisao: 'Deferido' ou 'Indeferido'
+    const usuario_id = req.usuario.id;
+
+    if (!['Deferido', 'Indeferido'].includes(decisao)) {
+        return res.status(400).json({ erro: "Decisão inválida." });
+    }
+
+    const statusFinal = 'Finalizado'; // Status geral do sistema
+    
+    // Atualiza status do documento
+    const sqlUpdate = `UPDATE documento SET status = ? WHERE id = ?`;
+    
+    // Insere tramitação final com a decisão
+    const sqlTramite = `
+        INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho)
+        SELECT setor_atual_id, setor_atual_id, setor_atual_id, ?, 'PROCESSO CONCLUÍDO. Decisão: ' || ? || '. Parecer: ' || ?
+        FROM documento WHERE id = ?
+    `;
+
+    db.serialize(() => {
+        db.run(sqlUpdate, [statusFinal, id], (err) => {
+            if (err) return res.status(500).json({ erro: "Erro ao atualizar status." });
+        });
+        db.run(sqlTramite, [usuario_id, decisao, texto_conclusao, id], (err) => {
+            if (err) return res.status(500).json({ erro: "Erro ao registrar conclusão." });
+            res.json({ mensagem: `Processo finalizado como ${decisao}.` });
+        });
+    });
+};
+
+// Funções de Edição e Arquivamento
 exports.editarDocumento = (req, res) => {
     const { id } = req.params;
     const { requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dados_extras } = req.body;
@@ -163,31 +209,18 @@ exports.editarDocumento = (req, res) => {
     const dadosExtrasStr = typeof dados_extras === 'object' ? JSON.stringify(dados_extras) : dados_extras;
     db.run(sql, [requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dadosExtrasStr, id], function(err) {
         if (err) return res.status(500).json({ erro: err.message });
-        if (this.changes === 0) return res.status(404).json({ erro: "Documento não encontrado." });
         res.json({ mensagem: "Atualizado com sucesso." });
     });
 };
 
 exports.arquivarDocumento = (req, res) => {
     const { id } = req.params;
-    const usuario_id = req.usuario.id; // Pega do token quem arquivou
-
-    // Exclusão lógica (RF-001)
+    const usuario_id = req.usuario.id;
     const sqlUpdate = `UPDATE documento SET status = 'Arquivado' WHERE id = ?`;
-    
-    // Registra no histórico que foi arquivado
-    const sqlTramite = `
-        INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho, data_hora)
-        SELECT id, setor_atual_id, setor_atual_id, ?, 'Documento Arquivado', CURRENT_TIMESTAMP
-        FROM documento WHERE id = ?
-    `;
-
+    const sqlTramite = `INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho) SELECT setor_atual_id, setor_atual_id, setor_atual_id, ?, 'Documento Arquivado' FROM documento WHERE id = ?`;
     db.serialize(() => {
-        db.run(sqlUpdate, [id], function(err) {
-            if (err) return res.status(500).json({ erro: "Erro ao arquivar." });
-            if (this.changes === 0) return res.status(404).json({ erro: "Documento não encontrado." });
-            db.run(sqlTramite, [usuario_id, id]);
-            res.json({ mensagem: "Arquivado com sucesso." });
-        });
+        db.run(sqlUpdate, [id]);
+        db.run(sqlTramite, [usuario_id, id]);
+        res.json({ mensagem: "Arquivado." });
     });
 };

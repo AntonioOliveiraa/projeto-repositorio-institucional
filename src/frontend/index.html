@@ -270,6 +270,60 @@
         </div>
     </div>
     <div id="toast" class="toast hidden"></div>
+
+    <div id="modalAnexar" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Anexar Documento</h2>
+                <button class="close-custom"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="formAnexar">
+                <input type="hidden" name="documento_id" id="anexarDocId">
+                <div class="form-group">
+                    <p class="info-text">Adicionando anexo ao protocolo: <strong id="anexarProtocoloDisplay">...</strong></p>
+                </div>
+                <div class="form-group">
+                    <label>Selecione o arquivo (PDF)</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" name="arquivo_extra" accept="application/pdf" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary close-custom">Cancelar</button>
+                    <button type="submit" class="btn-primary">Enviar Anexo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalConcluir" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Conclusão / Parecer Final</h2>
+                <button class="close-custom"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="formConcluir">
+                <input type="hidden" name="documento_id" id="concluirDocId">
+                <div class="form-group">
+                    <label>Decisão</label>
+                    <select name="decisao" required style="font-weight:bold;">
+                        <option value="">Selecione a decisão...</option>
+                        <option value="Deferido" style="color:green;">Deferido (Aprovado)</option>
+                        <option value="Indeferido" style="color:red;">Indeferido (Negado)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Parecer / Justificativa</label>
+                    <textarea name="texto_conclusao" rows="5" required placeholder="Descreva o motivo da decisão final..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary close-custom">Cancelar</button>
+                    <button type="submit" class="btn-primary">Finalizar Processo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
