@@ -1,15 +1,13 @@
 const db = require('../server');
 const gerarProtocolo = require('../utils/protocoloGenerator');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// --- SIMULAÇÃO DA IA (Lógica Centralizada) ---
-const simularClassificacaoIA = (texto) => {
-    const tagsPossiveis = ['Urgente', 'Administrativo', 'Análise Técnica', 'Deferimento', 'Indeferimento', 'Prioridade Legal', 'Sigiloso', 'Financeiro'];
-    // Embaralha e pega 3 aleatórias para simular análise
-    return tagsPossiveis.sort(() => 0.5 - Math.random()).slice(0, 3);
-};
+// --- CONFIGURAÇÃO DA IA (GEMINI) ---
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// --- Endpoint de Pré-análise ---
-exports.analisarAssuntoIA = (req, res) => {
+// Função que chama o Gemini de verdade
+exports.analisarAssuntoIA = async (req, res) => {
     const { texto } = req.body;
     
     // Validação simples
@@ -17,12 +15,33 @@ exports.analisarAssuntoIA = (req, res) => {
         return res.json({ tags: [] });
     }
 
-    const sugestoes = simularClassificacaoIA(texto);
+    try {
+        // Prompt engenhado para garantir o formato correto
+        const prompt = `
+            Você é um assistente de protocolo institucional. 
+            Analise o seguinte assunto de um documento oficial: "${texto}".
+            Gere de 3 a 5 tags curtas (máximo 2 palavras por tag) que classifiquem este documento.
+            Responda APENAS as tags separadas por vírgula, sem numeração e sem texto extra.
+            Exemplo de saída: Administrativo, Urgente, Solicitação de Verba
+        `;
 
-    // Simula um pequeno delay da "IA" (800ms)
-    setTimeout(() => {
-        res.json({ tags: sugestoes });
-    }, 800);
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const textResponse = response.text();
+
+        // Processa a resposta (remove quebras de linha e separa por vírgula)
+        const tags = textResponse
+            .split(',')
+            .map(tag => tag.trim())
+            .filter(tag => tag.length > 0);
+
+        res.json({ tags: tags });
+
+    } catch (error) {
+        console.error("Erro na IA:", error);
+        // Fallback: se a IA falhar (ex: quota ou internet), retorna tags genéricas
+        res.json({ tags: ['Processo Administrativo', 'Análise Manual'] });
+    }
 };
 
 exports.criarDocumento = async (req, res) => {
