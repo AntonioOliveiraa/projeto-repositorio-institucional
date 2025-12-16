@@ -2,12 +2,15 @@ import { API } from '../api.js';
 import { UI } from '../ui.js';
 import { setupTramitacao } from './tramitacao.js';
 
-export async function initDocumentos() {
+// Função de Inicialização agora aceita um termo de busca opcional
+export async function initDocumentos(termoBusca = '') {
     const contentArea = document.getElementById('contentArea');
     contentArea.innerHTML = `
         <div class="toolbar" style="display:flex; justify-content:space-between; margin-bottom: 1rem;">
             <h2>Gestão de Documentos</h2>
             <div style="display:flex; gap: 10px;">
+                ${termoBusca ? `<span class="badge" style="background:#fef3c7; color:#d97706; display:flex; align-items:center;">Filtrando por: "${termoBusca}" <i class="ph ph-x" style="cursor:pointer; margin-left:5px;" onclick="document.getElementById('btnLimparBusca').click()"></i></span>` : ''}
+                
                 <select id="filtroCategoria" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
                     <option value="">Todas as Categorias</option>
                     <option value="Servidor">Servidores</option>
@@ -19,22 +22,44 @@ export async function initDocumentos() {
                     <option value="Em Análise">Em Análise</option>
                     <option value="Finalizado">Finalizado</option>
                 </select>
+                <button id="btnLimparBusca" style="display:none;"></button>
             </div>
         </div>
         <div id="tabelaDocumentos"></div>
     `;
 
-    await carregarDocumentos();
-    setupEditarDocumento(); // Inicializa listener do form de edição
+    // Carrega documentos passando o termo de busca (se houver)
+    await carregarDocumentos({ busca: termoBusca });
+    
+    // Inicializa lógica de edição (necessário pois recriamos o DOM)
+    setupEditarDocumento();
 
-    document.getElementById('filtroStatus').addEventListener('change', (e) => carregarDocumentos({ status: e.target.value }));
-    document.getElementById('filtroCategoria').addEventListener('change', (e) => carregarDocumentos({ categoria: e.target.value }));
+    // Event Listeners dos Filtros
+    document.getElementById('filtroStatus').addEventListener('change', (e) => carregarDocumentos({ status: e.target.value, busca: termoBusca }));
+    document.getElementById('filtroCategoria').addEventListener('change', (e) => carregarDocumentos({ categoria: e.target.value, busca: termoBusca }));
+    
+    // Listener para limpar a busca
+    document.getElementById('btnLimparBusca').addEventListener('click', () => {
+        document.getElementById('globalSearch').value = ''; // Limpa o input lá em cima
+        initDocumentos(); // Recarrega tudo limpo
+    });
 }
 
+// A função carregarDocumentos deve processar o filtro 'busca'
 async function carregarDocumentos(filtros = {}) {
     try {
-        let qs = new URLSearchParams(filtros).toString();
-        const docs = await API.get(`/documentos?${qs}`);
+        // Remove chaves vazias/undefined para limpar a URL
+        const params = new URLSearchParams();
+        for (const key in filters) {
+            if (filters[key]) params.append(key, filters[key]);
+        }
+        // Correção simples para garantir que funcione com o objeto direto se URLSearchParams falhar com undefined
+        let queryString = '?';
+        if(filtros.status) queryString += `status=${filtros.status}&`;
+        if(filtros.categoria) queryString += `categoria=${filtros.categoria}&`;
+        if(filtros.busca) queryString += `busca=${encodeURIComponent(filtros.busca)}&`;
+
+        const docs = await API.get(`/documentos${queryString}`);
 
         UI.renderTable('tabelaDocumentos', 
             ['Protocolo', 'Categoria', 'Requerente', 'Assunto', 'Status', 'Ações'], 
@@ -59,13 +84,14 @@ async function carregarDocumentos(filtros = {}) {
             `
         );
 
-        // Listeners dos botões
+        // Reatribuir eventos aos botões da tabela (IMPORTANTE)
         document.querySelectorAll('.btn-ver').forEach(btn => btn.addEventListener('click', () => verDetalhes(btn.dataset.id)));
         document.querySelectorAll('.btn-tramitar').forEach(btn => btn.addEventListener('click', () => setupTramitacao(btn.dataset.id)));
         document.querySelectorAll('.btn-editar').forEach(btn => btn.addEventListener('click', () => abrirModalEdicao(btn.dataset.id)));
         document.querySelectorAll('.btn-arquivar').forEach(btn => btn.addEventListener('click', () => arquivarDocumento(btn.dataset.id)));
 
     } catch (error) {
+        console.error(error);
         UI.showToast('Erro ao carregar lista.', 'error');
     }
 }

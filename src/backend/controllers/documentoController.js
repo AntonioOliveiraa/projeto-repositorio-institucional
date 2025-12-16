@@ -96,14 +96,35 @@ exports.criarDocumento = async (req, res) => {
 };
 
 exports.listarDocumentos = (req, res) => {
-    // RF-001 e RF-007 (Filtros)
     const { status, categoria, busca } = req.query;
-    let sql = `SELECT d.*, s.nome as nome_setor_atual FROM documento d LEFT JOIN setor s ON d.setor_atual_id = s.id WHERE d.status != 'Arquivado'`;
+    
+    let sql = `
+        SELECT d.*, s.nome as nome_setor_atual 
+        FROM documento d
+        LEFT JOIN setor s ON d.setor_atual_id = s.id
+        WHERE d.status != 'Arquivado'
+    `;
+    
     const params = [];
-    if (status) { sql += " AND d.status = ?"; params.push(status); }
-    if (categoria) { sql += " AND d.categoria = ?"; params.push(categoria); }
-    if (busca) { sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ?)"; const termo = `%${busca}%`; params.push(termo, termo, termo); }
+
+    if (status) {
+        sql += " AND d.status = ?";
+        params.push(status);
+    }
+    if (categoria) {
+        sql += " AND d.categoria = ?";
+        params.push(categoria);
+    }
+    // --- CORREÇÃO DA BUSCA GLOBAL ---
+    if (busca) {
+        // Agora busca também no Assunto e nos Dados Extras (JSON)
+        sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ? OR d.assunto LIKE ? OR d.dados_extras LIKE ?)";
+        const termo = `%${busca}%`;
+        params.push(termo, termo, termo, termo, termo);
+    }
+
     sql += " ORDER BY d.id DESC";
+
     db.all(sql, params, (err, rows) => {
         if (err) return res.status(500).json({ erro: err.message });
         res.json(rows);

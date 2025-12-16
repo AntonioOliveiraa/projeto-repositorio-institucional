@@ -85,6 +85,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Lógica da Busca Global (NOVO) ---
+    const searchInput = document.getElementById('globalSearch');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const termo = e.target.value;
+                
+                // 1. Força a navegação visual para a aba 'Documentos'
+                const links = document.querySelectorAll('.nav-item');
+                links.forEach(l => l.classList.remove('active'));
+                const linkDocs = document.querySelector('.nav-item[data-view="documentos"]');
+                if (linkDocs) linkDocs.classList.add('active');
+
+                // 2. Atualiza o título da página
+                const title = document.getElementById('pageTitle');
+                if (title) title.textContent = 'Resultados da Busca';
+                
+                // 3. Carrega a view de documentos passando o termo pesquisado
+                // A função initDocumentos já foi importada no topo do arquivo
+                initDocumentos(termo);
+            }
+        });
+    }
+
     // 7. Inicialização dos Módulos
     initNotificacoes();
     setupNovoDocumento();
