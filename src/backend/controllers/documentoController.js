@@ -56,7 +56,7 @@ exports.criarDocumento = async (req, res) => {
         `;
 
         // Assumindo setor_origem_id padrão = 1 (Protocolo Geral) se não vier
-        const setor_origem_id = req.body.setor_origem_id || 1; 
+        const setor_origem_id = req.usuario.setor_id; 
 
         db.run(sqlDoc, [
             protocolo, categoria, assunto,
@@ -72,7 +72,7 @@ exports.criarDocumento = async (req, res) => {
                 INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho)
                 VALUES (?, ?, ?, ?, 'Abertura de Protocolo - ' + ?)
             `;
-            const usuario_id = req.body.usuario_id || 1;
+            const usuario_id = req.usuario.id;
             
             db.run(sqlTramite, [documentoId, setor_origem_id, setor_origem_id, usuario_id, categoria], (err) => {
                 if(err) console.error("Erro histórico inicial:", err);

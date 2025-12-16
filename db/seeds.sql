@@ -9,7 +9,7 @@ INSERT INTO setor (nome, sigla) VALUES ('Tecnologia da Informação', 'TI');
   aqui é um placeholder simbólico.
 */
 INSERT INTO usuario (nome, email, senha_hash, perfil, setor_id) 
-VALUES ('Administrador', 'admin@instituicao.com', '$2b$10$ExemploHashParaAdmin123', 'Admin', 1);
+VALUES ('Administrador', 'admin@instituicao.com', '$2b$10$93Wtca76xjILYkc91rLyTOZGVdU4Gjsng30TTApftRcyp5Z.kpChm', 'Admin', 1);
 
 /* Tags Iniciais para IA sugerir [cite: 77] */
 INSERT INTO tag (nome) VALUES ('Financeiro'), ('Solicitação'), ('Contrato'), ('Ofício'), ('Férias');

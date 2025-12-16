@@ -1,7 +1,9 @@
 const db = require('../server');
 
 exports.tramitarDocumento = (req, res) => {
-    const { documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho } = req.body;
+    const { documento_id, setor_destino_id, despacho } = req.body;
+    const usuario_id = req.usuario.id;
+    const setor_origem_id = req.usuario.setor_id;
 
     if (!documento_id || !setor_destino_id || !usuario_id) {
         return res.status(400).json({ erro: "Dados incompletos para tramitação." });

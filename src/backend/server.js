@@ -3,6 +3,10 @@ const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const authRoutes = require('./routes/authRoutes');
+const apiRoutes = require('./routes/apiRoutes');
+// Importar middleware de auth (não aplica no login, mas aplicará na API)
+const { verificarToken } = require('./utils/authMiddleware');
 
 const app = express();
 const PORT = 3000;
@@ -11,6 +15,13 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Para parsear form-data sem arquivo
+
+// Rotas Públicas (Login)
+app.use('/auth', authRoutes);
+
+// Rotas Protegidas (API do Sistema)
+// Todas as rotas /api agora exigem token!
+app.use('/api', verificarToken, apiRoutes);
 
 // Servir PDFs da pasta de uploads
 app.use('/uploads', express.static(path.join(__dirname, '../../frontend/uploads'))); 
