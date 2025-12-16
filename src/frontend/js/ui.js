@@ -2,7 +2,9 @@ export const UI = {
     // Renderiza uma tabela dinamicamente
     renderTable(containerId, headers, rows, renderRowCallback) {
         const container = document.getElementById(containerId);
-        if (!rows.length) {
+        if (!container) return; // Proteção se a view não estiver carregada
+
+        if (!rows || rows.length === 0) {
             container.innerHTML = '<div class="empty-state">Nenhum registro encontrado.</div>';
             return;
         }
@@ -21,16 +23,20 @@ export const UI = {
 
     // Controle de Modais
     openModal(modalId) {
-        document.getElementById(modalId).classList.remove('hidden');
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.remove('hidden');
     },
 
     closeModal(modalId) {
-        document.getElementById(modalId).classList.add('hidden');
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.add('hidden');
     },
 
     // Notificação Toast
     showToast(message, type = 'success') {
         const toast = document.getElementById('toast');
+        if (!toast) return;
+        
         toast.textContent = message;
         toast.className = `toast visible ${type}`;
         toast.classList.remove('hidden');
@@ -41,10 +47,26 @@ export const UI = {
     }
 };
 
-// Event Listeners globais para fechar modais
-document.querySelectorAll('.close-modal').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const modal = e.target.closest('.modal-overlay');
-        modal.classList.add('hidden');
+// Função de Inicialização dos Eventos Globais de UI
+export function initUI() {
+    // Fecha modais ao clicar no botão com classe .close-modal
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        // Remove listener antigo para evitar duplicidade (clone hack)
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.addEventListener('click', (e) => {
+            const modal = e.target.closest('.modal-overlay');
+            if (modal) modal.classList.add('hidden');
+        });
     });
-});
+
+    // Fecha ao clicar fora do modal (Overlay)
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.classList.add('hidden');
+            }
+        });
+    });
+}

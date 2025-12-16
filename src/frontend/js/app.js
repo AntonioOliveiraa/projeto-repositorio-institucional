@@ -1,4 +1,4 @@
-import { UI } from './ui.js';
+import { UI, initUI } from './ui.js';
 import { initDashboard } from './modules/dashboard.js';
 import { initDocumentos, setupNovoDocumento } from './modules/documentos.js';
 import { initTramitacaoListener } from './modules/tramitacao.js';
@@ -18,13 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const usuario = JSON.parse(usuarioStr);
 
-    // --- Lógica para mostrar menu de Usuários (APENAS ADMIN) ---
     if (usuario.perfil === 'Admin') {
         const menuUsuarios = document.getElementById('menuUsuarios');
         if (menuUsuarios) menuUsuarios.classList.remove('hidden');
     }
 
-    // 2. Atualizar UI com dados do Usuário
+    // 2. Atualizar UI do Usuário
     const userProfileEl = document.querySelector('.user-profile .info');
     if(userProfileEl) {
         userProfileEl.innerHTML = `
@@ -34,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // 3. Controle de Perfil
     if (usuario.perfil === 'Consulta') {
         const btnNovo = document.getElementById('btnNovoDocumento');
         if (btnNovo) btnNovo.remove();
@@ -43,14 +41,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.head.appendChild(style);
     }
 
-    // 4. Logout
+    // 3. Logout
     document.getElementById('btnLogout')?.addEventListener('click', (e) => {
         e.preventDefault();
         localStorage.clear();
         window.location.href = 'login.html';
     });
 
-    // 5. Navegação
+    // 4. Navegação
     const links = document.querySelectorAll('.nav-item[data-view]');
     links.forEach(link => {
         link.addEventListener('click', (e) => {
@@ -62,38 +60,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 6. Botão Novo Documento
+    // 5. Botão Novo Documento (Abertura do Modal)
     const btnNovo = document.getElementById('btnNovoDocumento');
     if(btnNovo) {
         btnNovo.addEventListener('click', (e) => {
             e.preventDefault();
-            if (UI && UI.openModal) UI.openModal('modalNovoDocumento');
+            UI.openModal('modalNovoDocumento');
         });
     }
 
-    // Lógica da Busca Global
+    // 6. Busca Global
     const searchInput = document.getElementById('globalSearch');
     if (searchInput) {
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 const termo = e.target.value;
-                
-                // Força navegação para Documentos
                 const links = document.querySelectorAll('.nav-item');
                 links.forEach(l => l.classList.remove('active'));
                 const linkDocs = document.querySelector('.nav-item[data-view="documentos"]');
                 if (linkDocs) linkDocs.classList.add('active');
-
                 const title = document.getElementById('pageTitle');
                 if (title) title.textContent = 'Resultados da Busca';
-                
-                // Dispara a busca
                 initDocumentos(termo);
             }
         });
     }
 
-    // 7. Inicialização
+    // 7. Inicialização dos Módulos e UI
+    initUI(); // <--- ATIVA OS BOTÕES DE FECHAR/CANCELAR GLOBALMENTE
     initNotificacoes();
     setupNovoDocumento();
     initTramitacaoListener();
