@@ -176,6 +176,7 @@ body {
 .badge.finalizado { background: #d1fae5; color: #065f46; }
 
 /* Modais */
+/* --- Modais --- */
 .modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -185,20 +186,64 @@ body {
     justify-content: center;
     z-index: 1000;
     opacity: 1; transition: opacity 0.2s;
+    /* Garante que o modal não fique cortado em telas muito pequenas */
+    padding: 1rem; 
 }
 .modal-overlay.hidden { display: none; opacity: 0; }
 
 .modal-card {
     background: white;
-    padding: 2rem;
     border-radius: var(--radius);
-    width: 500px;
-    max-width: 90%;
+    width: 500px; /* Largura padrão, pode ser sobrescrita via style inline no HTML */
+    max-width: 100%;
     box-shadow: var(--shadow-md);
+
+    /* (RF-UX) */
+    max-height: 90vh;       /* Limita a altura a 90% da tela */
+    display: flex;          /* Layout flexível */
+    flex-direction: column; /* Organiza header e corpo em coluna */
+    overflow: hidden;       /* Garante que o scroll fique dentro e bordas arredondadas funcionem */
+    padding: 0;             /* Remove padding geral para controlar nos filhos */
 }
+
 .modal-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 1.5rem;
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    /* Padding movido para cá */
+    padding: 1.5rem 2rem; 
+    border-bottom: 1px solid var(--border-color);
+    background: white;
+    flex-shrink: 0; /* Garante que o cabeçalho fique fixo e não encolha */
+}
+
+.modal-header h2 {
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+/* O Formulário se torna a área de rolagem */
+.modal-card form {
+    padding: 2rem;
+    overflow-y: auto; /* Adiciona scroll vertical se o conteúdo for grande */
+    display: flex;
+    flex-direction: column;
+    /* Estilização da barra de rolagem (Chrome/Safari/Edge) */
+    scrollbar-width: thin;
+    scrollbar-color: var(--secondary-color) transparent;
+}
+
+/* Ajuste fino para scrollbar webkit */
+.modal-card form::-webkit-scrollbar { width: 6px; }
+.modal-card form::-webkit-scrollbar-track { background: transparent; }
+.modal-card form::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+
+.modal-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
 }
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; }
