@@ -6,6 +6,7 @@ const upload = require('../utils/uploadConfig');
 const documentoController = require('../controllers/documentoController');
 const tramitacaoController = require('../controllers/tramitacaoController');
 const auxiliarController = require('../controllers/auxiliarController');
+const notificacaoController = require('../controllers/notificacaoController');
 
 // --- Rotas de Documentos ---
 // POST /api/documentos - Cria documento com upload de PDF (RF-001)
