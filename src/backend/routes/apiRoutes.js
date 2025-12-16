@@ -27,6 +27,10 @@ router.delete('/documentos/:id', documentoController.arquivarDocumento);
 // POST /api/tramitar - Movimentação entre setores (RF-004)
 router.post('/tramitar', tramitacaoController.tramitarDocumento);
 
+// --- Rotas de Notificações (RF-009) ---
+router.get('/notificacoes', notificacaoController.listarNotificacoes);
+router.put('/notificacoes/:id/ler', notificacaoController.marcarComoLida);
+
 // --- Rotas Auxiliares ---
 router.get('/setores', auxiliarController.listarSetores);
 router.get('/usuarios', auxiliarController.listarUsuarios);

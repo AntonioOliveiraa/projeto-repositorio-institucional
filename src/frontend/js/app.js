@@ -2,6 +2,7 @@ import { UI } from './ui.js';
 import { initDashboard } from './modules/dashboard.js';
 import { initDocumentos, setupNovoDocumento } from './modules/documentos.js';
 import { initTramitacaoListener } from './modules/tramitacao.js';
+import { initNotificacoes } from './modules/notificacoes.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -78,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 7. Inicialização dos Módulos
+    initNotificacoes();
     setupNovoDocumento();
     initTramitacaoListener();
     
