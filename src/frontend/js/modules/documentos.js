@@ -4,8 +4,15 @@ import { setupTramitacao } from './tramitacao.js';
 
 // --- INICIALIZAÇÃO E LISTAGEM ---
 
+// Variável de estado para controlar a página atual
+let currentPage = 1;
+const itemsPerPage = 100; // Limite solicitado
+
 // Aceita o termo de busca para filtrar ao iniciar
 export async function initDocumentos(termoBusca = '') {
+    // Reset da página ao entrar na tela ou fazer nova busca completa
+    currentPage = 1;
+
     const contentArea = document.getElementById('contentArea');
     
     // Carrega setores para o filtro
@@ -15,7 +22,7 @@ export async function initDocumentos(termoBusca = '') {
         setoresHtml += setores.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
     } catch(e) { console.error('Erro ao carregar setores', e); }
 
-    // HTML da barra de ferramentas com aviso de filtro e novo Select de Setor
+    // HTML da barra de ferramentas com aviso de filtro, Select de Setor e Container de Paginação
     contentArea.innerHTML = `
         <div class="toolbar" style="display:flex; justify-content:space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
             <h2>Gestão de Documentos</h2>
@@ -45,7 +52,11 @@ export async function initDocumentos(termoBusca = '') {
                 </select>
             </div>
         </div>
+        
         <div id="tabelaDocumentos"></div>
+
+        <div id="paginationControls" style="display:flex; justify-content:center; align-items:center; gap:15px; margin-top:20px; padding-bottom:20px;">
+        </div>
     `;
 
     // Carrega documentos aplicando o filtro de busca inicial
@@ -57,17 +68,18 @@ export async function initDocumentos(termoBusca = '') {
 
     // Eventos de mudança nos dropdowns (Unificados)
     const onChangeFilter = () => {
+        currentPage = 1; // Reseta para pág 1 ao mudar filtro
         carregarDocumentos({ 
             status: document.getElementById('filtroStatus').value, 
             categoria: document.getElementById('filtroCategoria').value, 
-            setor_id: document.getElementById('filtroSetor').value, // Envia o ID do setor
+            setor_id: document.getElementById('filtroSetor').value,
             busca: termoBusca 
         });
     };
 
     document.getElementById('filtroStatus').addEventListener('change', onChangeFilter);
     document.getElementById('filtroCategoria').addEventListener('change', onChangeFilter);
-    document.getElementById('filtroSetor').addEventListener('change', onChangeFilter); // Listener do setor
+    document.getElementById('filtroSetor').addEventListener('change', onChangeFilter);
     
     // Botão "X" para limpar a busca
     const btnLimpar = document.getElementById('btnLimparBadge');
@@ -82,16 +94,20 @@ export async function initDocumentos(termoBusca = '') {
 
 async function carregarDocumentos(filtros = {}) {
     try {
-        // Monta Query String
-        let qs = '?';
-        if(filtros.status) qs += `status=${filtros.status}&`;
-        if(filtros.categoria) qs += `categoria=${filtros.categoria}&`;
-        if(filtros.setor_id) qs += `setor_id=${filtros.setor_id}&`; // Adiciona à URL
-        if(filtros.busca) qs += `busca=${encodeURIComponent(filtros.busca)}&`;
+        // Monta Query String com Paginação
+        let qs = `?page=${currentPage}&limit=${itemsPerPage}`;
+        
+        if(filtros.status) qs += `&status=${filtros.status}`;
+        if(filtros.categoria) qs += `&categoria=${filtros.categoria}`;
+        if(filtros.setor_id) qs += `&setor_id=${filtros.setor_id}`;
+        if(filtros.busca) qs += `&busca=${encodeURIComponent(filtros.busca)}`;
 
-        const docs = await API.get(`/documentos${qs}`);
+        // A resposta agora é um objeto { data: [], pagination: {} }
+        const response = await API.get(`/documentos${qs}`);
+        const docs = response.data || []; // Fallback para array vazio se undefined
+        const pagination = response.pagination || {};
 
-        // Adicionado 'Setor Atual' na lista de colunas
+        // Renderiza Tabela
         UI.renderTable('tabelaDocumentos', 
             ['Protocolo', 'Categoria', 'Requerente', 'Assunto', 'Setor Atual', 'Status', 'Ações'], 
             docs, 
@@ -125,6 +141,9 @@ async function carregarDocumentos(filtros = {}) {
             `}
         );
 
+        // Renderiza Controles de Paginação
+        renderPagination(pagination, filtros);
+
         // Atribui eventos aos botões
         document.querySelectorAll('.btn-ver').forEach(btn => btn.addEventListener('click', () => verDetalhes(btn.dataset.id)));
         document.querySelectorAll('.btn-tramitar').forEach(btn => btn.addEventListener('click', () => setupTramitacao(btn.dataset.id)));
@@ -135,7 +154,45 @@ async function carregarDocumentos(filtros = {}) {
 
     } catch (error) {
         UI.showToast('Erro ao carregar lista.', 'error');
+        console.error(error);
     }
+}
+
+function renderPagination(pagination, currentFilters) {
+    const container = document.getElementById('paginationControls');
+    if (!container) return;
+
+    // Se não houver paginação ou apenas 1 página, esconde os controles
+    if (!pagination || pagination.totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <button id="btnPagePrev" class="btn-secondary" ${pagination.currentPage === 1 ? 'disabled' : ''} style="padding:5px 15px;">
+            <i class="ph ph-caret-left"></i> Anterior
+        </button>
+        <span style="font-size:0.9rem; color:#666;">
+            Página <strong>${pagination.currentPage}</strong> de ${pagination.totalPages}
+        </span>
+        <button id="btnPageNext" class="btn-secondary" ${pagination.currentPage >= pagination.totalPages ? 'disabled' : ''} style="padding:5px 15px;">
+            Próximo <i class="ph ph-caret-right"></i>
+        </button>
+    `;
+
+    document.getElementById('btnPagePrev').onclick = () => {
+        if (currentPage > 1) {
+            currentPage--;
+            carregarDocumentos(currentFilters);
+        }
+    };
+
+    document.getElementById('btnPageNext').onclick = () => {
+        if (currentPage < pagination.totalPages) {
+            currentPage++;
+            carregarDocumentos(currentFilters);
+        }
+    };
 }
 
 // --- FUNÇÕES DE ANEXO E CONCLUSÃO ---

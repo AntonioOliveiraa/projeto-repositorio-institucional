@@ -23,7 +23,7 @@ exports.criarDocumento = async (req, res) => {
         } = req.body;
 
         const caminho_anexo = req.file ? `/uploads/${req.file.filename}` : null;
-        
+
         // Filtro de Dados Extras por Categoria
         // Em vez de pegar tudo, pegamos apenas o que pertence à categoria
         const dadosExtrasObj = {};
@@ -56,7 +56,7 @@ exports.criarDocumento = async (req, res) => {
         `;
 
         // Assumindo setor_origem_id padrão = 1 (Protocolo Geral) se não vier
-        const setor_origem_id = req.usuario.setor_id; 
+        const setor_origem_id = req.usuario.setor_id;
         const usuario_id = req.usuario.id;
 
         db.run(sqlDoc, [
@@ -90,43 +90,69 @@ exports.criarDocumento = async (req, res) => {
 };
 
 exports.listarDocumentos = (req, res) => {
-    // Adicionado setor_id aos parâmetros de consulta
+    // Parâmetros de Paginação (RF-001)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100; // Limite padrão de 100 itens
+    const offset = (page - 1) * limit;
+
     const { status, categoria, busca, setor_id } = req.query;
-    
-    let sql = `
-        SELECT d.*, s.nome as nome_setor_atual 
-        FROM documento d
-        LEFT JOIN setor s ON d.setor_atual_id = s.id
-        WHERE d.status != 'Arquivado'
-    `;
-    
+
+    // Construtor da cláusula WHERE dinâmico
+    let whereClause = "WHERE d.status != 'Arquivado'";
     const params = [];
 
-    if (status) {
-        sql += " AND d.status = ?";
-        params.push(status);
-    }
-    if (categoria) {
-        sql += " AND d.categoria = ?";
-        params.push(categoria);
-    }
-    // Filtro SQL por Setor
-    if (setor_id) {
-        sql += " AND d.setor_atual_id = ?";
-        params.push(setor_id);
-    }
-
+    if (status) { whereClause += " AND d.status = ?"; params.push(status); }
+    if (categoria) { whereClause += " AND d.categoria = ?"; params.push(categoria); }
+    if (setor_id) { whereClause += " AND d.setor_atual_id = ?"; params.push(setor_id); }
     if (busca) {
-        sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ? OR d.assunto LIKE ? OR d.dados_extras LIKE ?)";
+        whereClause += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ? OR d.assunto LIKE ? OR d.dados_extras LIKE ?)";
         const termo = `%${busca}%`;
         params.push(termo, termo, termo, termo, termo);
     }
 
-    sql += " ORDER BY d.id DESC";
+    // 1. Query de Contagem (Total de registros para paginação)
+    const sqlCount = `
+        SELECT COUNT(*) as total 
+        FROM documento d 
+        LEFT JOIN setor s ON d.setor_atual_id = s.id 
+        ${whereClause}
+    `;
 
-    db.all(sql, params, (err, rows) => {
-        if (err) return res.status(500).json({ erro: err.message });
-        res.json(rows);
+    // 2. Query de Dados (Com Limit e Offset)
+    const sqlData = `
+        SELECT d.*, s.nome as nome_setor_atual 
+        FROM documento d
+        LEFT JOIN setor s ON d.setor_atual_id = s.id
+        ${whereClause}
+        ORDER BY d.id DESC
+        LIMIT ? OFFSET ?
+    `;
+
+    // Executa Count
+    db.get(sqlCount, params, (errCount, rowCount) => {
+        if (errCount) return res.status(500).json({ erro: errCount.message });
+
+        const totalItems = rowCount.total;
+        const totalPages = Math.ceil(totalItems / limit);
+
+        // Adiciona limit/offset aos parâmetros para a query de dados
+        const dataParams = [...params, limit, offset];
+
+        // Executa Data Fetch
+        db.all(sqlData, dataParams, (errData, rows) => {
+            if (errData) return res.status(500).json({ erro: errData.message });
+
+            // Retorna estrutura paginada
+            res.json({
+                data: rows,
+                pagination: {
+                    totalItems,
+                    totalPages,
+                    currentPage: page,
+                    itemsPerPage: limit
+                }
+            });
+        });
     });
 };
 
@@ -144,8 +170,8 @@ exports.obterDocumento = (req, res) => {
 
     db.get(sqlDoc, [id], (err, doc) => {
         if (err || !doc) return res.status(404).json({ erro: "Documento não encontrado" });
-        if(doc.dados_extras) { try { doc.dados_extras = JSON.parse(doc.dados_extras); } catch(e) {} }
-        
+        if (doc.dados_extras) { try { doc.dados_extras = JSON.parse(doc.dados_extras); } catch (e) { } }
+
         db.all(sqlAnexos, [id], (errAnx, anexos) => {
             db.all(sqlHist, [id], (errHist, historico) => {
                 res.json({ ...doc, anexos: anexos || [], historico: historico || [] });
@@ -157,14 +183,14 @@ exports.obterDocumento = (req, res) => {
 exports.anexarArquivo = (req, res) => {
     const { id } = req.params;
     if (!req.file) return res.status(400).json({ erro: "Nenhum arquivo enviado." });
-    
+
     const caminho = `/uploads/${req.file.filename}`;
     const nome_original = req.file.originalname;
     const usuario_id = req.usuario.id;
 
     const sql = `INSERT INTO anexo (documento_id, nome_arquivo, caminho, usuario_id) VALUES (?, ?, ?, ?)`;
-    
-    db.run(sql, [id, nome_original, caminho, usuario_id], function(err) {
+
+    db.run(sql, [id, nome_original, caminho, usuario_id], function (err) {
         if (err) return res.status(500).json({ erro: err.message });
         
         // Opcional: Registrar no histórico que houve um anexo
@@ -177,24 +203,13 @@ exports.anexarArquivo = (req, res) => {
 
 exports.finalizarDocumento = (req, res) => {
     const { id } = req.params;
-    const { decisao, texto_conclusao } = req.body; // decisao: 'Deferido' ou 'Indeferido'
+    const { decisao, texto_conclusao } = req.body;
     const usuario_id = req.usuario.id;
 
-    if (!['Deferido', 'Indeferido'].includes(decisao)) {
-        return res.status(400).json({ erro: "Decisão inválida." });
-    }
+    if (!['Deferido', 'Indeferido'].includes(decisao)) return res.status(400).json({ erro: "Decisão inválida." });
 
-    const statusFinal = 'Finalizado'; // Status geral do sistema
-    
-    // Atualiza status do documento
-    const sqlUpdate = `UPDATE documento SET status = ? WHERE id = ?`;
-    
-    // Insere tramitação final com a decisão
-    const sqlTramite = `
-        INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho)
-        SELECT setor_atual_id, setor_atual_id, setor_atual_id, ?, 'PROCESSO CONCLUÍDO. Decisão: ' || ? || '. Parecer: ' || ?
-        FROM documento WHERE id = ?
-    `;
+    const sqlUpdate = `UPDATE documento SET status = 'Finalizado' WHERE id = ?`;
+    const sqlTramite = `INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho) SELECT setor_atual_id, setor_atual_id, setor_atual_id, ?, 'PROCESSO CONCLUÍDO. Decisão: ' || ? || '. Parecer: ' || ? FROM documento WHERE id = ?`;
 
     db.serialize(() => {
         db.run(sqlUpdate, [id]);
@@ -211,7 +226,7 @@ exports.editarDocumento = (req, res) => {
     const { requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dados_extras } = req.body;
     const sql = `UPDATE documento SET requerente_nome = ?, requerente_cpf = ?, requerente_matricula = ?, requerente_email = ?, requerente_telefone = ?, assunto = ?, dados_extras = ? WHERE id = ?`;
     const dadosExtrasStr = typeof dados_extras === 'object' ? JSON.stringify(dados_extras) : dados_extras;
-    db.run(sql, [requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dadosExtrasStr, id], function(err) {
+    db.run(sql, [requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dadosExtrasStr, id], function (err) {
         if (err) return res.status(500).json({ erro: err.message });
         res.json({ mensagem: "Atualizado com sucesso." });
     });
