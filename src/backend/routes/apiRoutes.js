@@ -17,6 +17,12 @@ router.get('/documentos', documentoController.listarDocumentos);
 // GET /api/documentos/:id - Detalhes e Histórico (RF-001, RF-005)
 router.get('/documentos/:id', documentoController.obterDocumento);
 
+// PUT /api/documentos/:id - Edição (RF-001)
+router.put('/documentos/:id', documentoController.editarDocumento);
+
+// DELETE /api/documentos/:id - Arquivamento (RF-006)
+router.delete('/documentos/:id', documentoController.arquivarDocumento);
+
 // --- Rotas de Tramitação ---
 // POST /api/tramitar - Movimentação entre setores (RF-004)
 router.post('/tramitar', tramitacaoController.tramitarDocumento);

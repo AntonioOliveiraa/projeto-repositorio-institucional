@@ -160,3 +160,54 @@ exports.obterDocumento = (req, res) => {
         });
     });
 };
+
+exports.editarDocumento = (req, res) => {
+    const { id } = req.params;
+    const { requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dados_extras } = req.body;
+
+    // Proteção: Não permitimos editar numero_protocolo, status ou ids de chave estrangeira diretamente aqui
+    const sql = `
+        UPDATE documento 
+        SET requerente_nome = ?, requerente_cpf = ?, requerente_matricula = ?, 
+            requerente_email = ?, requerente_telefone = ?, assunto = ?, dados_extras = ?
+        WHERE id = ?
+    `;
+
+    // Se dados_extras for um objeto, converte para string
+    const dadosExtrasStr = typeof dados_extras === 'object' ? JSON.stringify(dados_extras) : dados_extras;
+
+    db.run(sql, [requerente_nome, requerente_cpf, requerente_matricula, requerente_email, requerente_telefone, assunto, dadosExtrasStr, id], function(err) {
+        if (err) return res.status(500).json({ erro: "Erro ao editar documento: " + err.message });
+        if (this.changes === 0) return res.status(404).json({ erro: "Documento não encontrado." });
+        
+        res.json({ mensagem: "Documento atualizado com sucesso." });
+    });
+};
+
+exports.arquivarDocumento = (req, res) => {
+    const { id } = req.params;
+    const usuario_id = req.usuario.id; // Pega do token quem arquivou
+
+    // Exclusão lógica (RF-001)
+    const sqlUpdate = `UPDATE documento SET status = 'Arquivado' WHERE id = ?`;
+    
+    // Registra no histórico que foi arquivado
+    const sqlTramite = `
+        INSERT INTO tramitacao (documento_id, setor_origem_id, setor_destino_id, usuario_id, despacho, data_hora)
+        SELECT id, setor_atual_id, setor_atual_id, ?, 'Documento Arquivado', CURRENT_TIMESTAMP
+        FROM documento WHERE id = ?
+    `;
+
+    db.serialize(() => {
+        db.run(sqlUpdate, [id], function(err) {
+            if (err) return res.status(500).json({ erro: "Erro ao arquivar." });
+            if (this.changes === 0) return res.status(404).json({ erro: "Documento não encontrado." });
+
+            db.run(sqlTramite, [usuario_id, id], (errT) => {
+                if (errT) console.error("Erro ao registrar histórico de arquivamento", errT);
+            });
+
+            res.json({ mensagem: "Documento arquivado com sucesso." });
+        });
+    });
+};

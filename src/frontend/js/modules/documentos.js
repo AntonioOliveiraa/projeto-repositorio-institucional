@@ -2,8 +2,6 @@ import { API } from '../api.js';
 import { UI } from '../ui.js';
 import { setupTramitacao } from './tramitacao.js';
 
-let documentosCache = [];
-
 export async function initDocumentos() {
     const contentArea = document.getElementById('contentArea');
     contentArea.innerHTML = `
@@ -27,8 +25,8 @@ export async function initDocumentos() {
     `;
 
     await carregarDocumentos();
+    setupEditarDocumento(); // Inicializa listener do form de edição
 
-    // Filtros
     document.getElementById('filtroStatus').addEventListener('change', (e) => carregarDocumentos({ status: e.target.value }));
     document.getElementById('filtroCategoria').addEventListener('change', (e) => carregarDocumentos({ categoria: e.target.value }));
 }
@@ -37,7 +35,6 @@ async function carregarDocumentos(filtros = {}) {
     try {
         let qs = new URLSearchParams(filtros).toString();
         const docs = await API.get(`/documentos?${qs}`);
-        documentosCache = docs;
 
         UI.renderTable('tabelaDocumentos', 
             ['Protocolo', 'Categoria', 'Requerente', 'Assunto', 'Status', 'Ações'], 
@@ -52,23 +49,119 @@ async function carregarDocumentos(filtros = {}) {
                     </td>
                     <td>${doc.assunto}</td>
                     <td><span class="badge ${getStatusClass(doc.status)}">${doc.status}</span></td>
-                    <td>
+                    <td class="acoes-col">
                         <button class="btn-icon btn-ver" data-id="${doc.id}" title="Ver Detalhes"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon btn-editar" data-id="${doc.id}" title="Editar"><i class="ph ph-pencil-simple"></i></button>
                         <button class="btn-icon btn-tramitar" data-id="${doc.id}" title="Tramitar"><i class="ph ph-paper-plane-right"></i></button>
+                        <button class="btn-icon btn-arquivar" data-id="${doc.id}" title="Arquivar" style="color:var(--danger)"><i class="ph ph-archive"></i></button>
                     </td>
                 </tr>
             `
         );
 
+        // Listeners dos botões
         document.querySelectorAll('.btn-ver').forEach(btn => btn.addEventListener('click', () => verDetalhes(btn.dataset.id)));
         document.querySelectorAll('.btn-tramitar').forEach(btn => btn.addEventListener('click', () => setupTramitacao(btn.dataset.id)));
+        
+        document.querySelectorAll('.btn-editar').forEach(btn => btn.addEventListener('click', () => abrirModalEdicao(btn.dataset.id)));
+        document.querySelectorAll('.btn-arquivar').forEach(btn => btn.addEventListener('click', () => arquivarDocumento(btn.dataset.id)));
 
     } catch (error) {
         UI.showToast('Erro ao carregar lista.', 'error');
     }
 }
 
-// Lógica do Modal de Cadastro Dinâmico
+// --- Lógica de Edição ---
+async function abrirModalEdicao(id) {
+    try {
+        const doc = await API.get(`/documentos/${id}`);
+        
+        // Preencher campos comuns
+        document.getElementById('editDocId').value = doc.id;
+        document.getElementById('editCategoriaHidden').value = doc.categoria;
+        document.getElementById('editNome').value = doc.requerente_nome;
+        document.getElementById('editCpf').value = doc.requerente_cpf;
+        document.getElementById('editMatricula').value = doc.requerente_matricula || '';
+        document.getElementById('editTelefone').value = doc.requerente_telefone || '';
+        document.getElementById('editEmail').value = doc.requerente_email || '';
+        document.getElementById('editAssunto').value = doc.assunto;
+
+        // Gerar campos extras dinamicamente
+        const container = document.getElementById('editExtraFields');
+        container.innerHTML = '';
+        if (doc.dados_extras) {
+            // doc.dados_extras já é objeto (parseado no controller)
+            for (const [key, value] of Object.entries(doc.dados_extras)) {
+                const label = key.charAt(0).toUpperCase() + key.slice(1);
+                container.innerHTML += `
+                    <div class="form-group">
+                        <label>${label}</label>
+                        <input type="text" name="extra_${key}" value="${value}">
+                    </div>
+                `;
+            }
+        }
+
+        UI.openModal('modalEditarDocumento');
+    } catch (error) {
+        console.error(error);
+        UI.showToast('Erro ao carregar dados para edição.', 'error');
+    }
+}
+
+function setupEditarDocumento() {
+    const form = document.getElementById('formEditarDocumento');
+    if(!form) return; // Evita erro se o modal não existir na view
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const id = formData.get('id');
+        
+        // Reconstrói o objeto de dados
+        const dados = {
+            requerente_nome: formData.get('requerente_nome'),
+            requerente_cpf: formData.get('requerente_cpf'),
+            requerente_matricula: formData.get('requerente_matricula'),
+            requerente_email: formData.get('requerente_email'),
+            requerente_telefone: formData.get('requerente_telefone'),
+            assunto: formData.get('assunto'),
+            dados_extras: {}
+        };
+
+        // Captura os campos extras dinâmicos (prefixo "extra_")
+        for (const [key, value] of formData.entries()) {
+            if (key.startsWith('extra_')) {
+                const realKey = key.replace('extra_', '');
+                dados.dados_extras[realKey] = value;
+            }
+        }
+
+        try {
+            await API.put(`/documentos/${id}`, dados);
+            UI.closeModal('modalEditarDocumento');
+            UI.showToast('Documento atualizado!');
+            carregarDocumentos();
+        } catch (error) {
+            UI.showToast('Erro ao salvar alterações.', 'error');
+        }
+    });
+}
+
+// --- Lógica de Arquivamento ---
+async function arquivarDocumento(id) {
+    if(!confirm('Tem certeza que deseja arquivar este documento? Ele sairá da lista principal.')) return;
+
+    try {
+        await API.delete(`/documentos/${id}`);
+        UI.showToast('Documento arquivado.');
+        carregarDocumentos();
+    } catch (error) {
+        UI.showToast('Erro ao arquivar.', 'error');
+    }
+}
+
+// --- Lógica de Cadastro (Mantida, apenas reexportada) ---
 export function setupNovoDocumento() {
     const form = document.getElementById('formNovoDocumento');
     const selectCat = document.getElementById('selectCategoria');
@@ -77,7 +170,8 @@ export function setupNovoDocumento() {
     const assuntoServidor = document.getElementById('assuntoServidor');
     const assuntoAcademico = document.getElementById('assuntoAcademico');
 
-    // Alternar campos baseado na categoria
+    if(!form) return;
+
     selectCat.addEventListener('change', (e) => {
         const val = e.target.value;
         if(val === 'Servidor') {
@@ -99,50 +193,38 @@ export function setupNovoDocumento() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(form);
-        
-        // Determina qual é o campo "assunto" real baseado na categoria
         const categoria = formData.get('categoria');
-        if (categoria === 'Servidor') {
-            formData.append('assunto', formData.get('assunto_servidor'));
-        } else {
-            formData.append('assunto', formData.get('assunto_academico'));
-        }
+        if (categoria === 'Servidor') formData.append('assunto', formData.get('assunto_servidor'));
+        else formData.append('assunto', formData.get('assunto_academico'));
 
         try {
             const res = await API.upload('/documentos', formData);
             UI.closeModal('modalNovoDocumento');
-            UI.showToast(`Protocolo ${res.protocolo} gerado com sucesso!`);
+            UI.showToast(`Protocolo ${res.protocolo} gerado!`);
             form.reset();
             fieldsServidor.classList.add('hidden-field');
             fieldsAcademico.classList.add('hidden-field');
-            
             const contentArea = document.getElementById('contentArea');
             if(contentArea.querySelector('#tabelaDocumentos')) carregarDocumentos();
-
         } catch (error) {
-            UI.showToast('Erro ao registrar protocolo.', 'error');
+            UI.showToast('Erro ao registrar.', 'error');
         }
     });
 }
 
-// Visualização de Detalhes
+// Detalhes (Mantido)
 async function verDetalhes(id) {
     try {
         const doc = await API.get(`/documentos/${id}`);
-        
-        // Renderizar dados extras
         let extrasHtml = '';
         if (doc.dados_extras) {
-            const extras = doc.dados_extras; // Já vem como objeto do controller
             extrasHtml = '<div style="background:#f8fafc; padding:10px; border-radius:6px; margin:10px 0; font-size:0.9rem;">';
-            for (const [key, value] of Object.entries(extras)) {
-                // Formata a chave (ex: curso -> Curso)
+            for (const [key, value] of Object.entries(doc.dados_extras)) {
                 const label = key.charAt(0).toUpperCase() + key.slice(1);
                 if(value) extrasHtml += `<p><strong>${label}:</strong> ${value}</p>`;
             }
             extrasHtml += '</div>';
         }
-
         const historicoHtml = doc.historico.map(h => `
             <div class="timeline-item" style="border-left: 2px solid #e2e8f0; padding-left: 15px; margin-bottom: 15px;">
                 <div style="font-size: 0.8rem; color: #64748b;">${new Date(h.data_hora).toLocaleString()}</div>
@@ -151,7 +233,6 @@ async function verDetalhes(id) {
                 <div style="font-size: 0.75rem; color: #94a3b8;">Por: ${h.usuario_nome}</div>
             </div>
         `).join('');
-
         const content = `
             <div style="padding: 1rem;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -168,10 +249,8 @@ async function verDetalhes(id) {
                 <div style="margin-top: 10px;">${historicoHtml}</div>
             </div>
         `;
-        
         mostrarModalDetalhes(content);
     } catch (error) {
-        console.error(error);
         UI.showToast('Erro ao carregar detalhes', 'error');
     }
 }

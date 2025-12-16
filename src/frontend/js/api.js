@@ -20,9 +20,7 @@ function handleAuthError(response) {
 
 export const API = {
     async get(endpoint) {
-        const response = await fetch(`${API_BASE}${endpoint}`, {
-            headers: getHeaders()
-        });
+        const response = await fetch(`${API_BASE}${endpoint}`, { headers: getHeaders() });
         handleAuthError(response);
         return await response.json();
     },
@@ -38,7 +36,27 @@ export const API = {
         return await response.json();
     },
 
-    // Envio de Arquivos (FormData)
+    // Método para Edição
+    async put(endpoint, data) {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+        handleAuthError(response);
+        return await response.json();
+    },
+
+    // Método para Arquivamento/Exclusão
+    async delete(endpoint) {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+        handleAuthError(response);
+        return await response.json();
+    },
+
     async upload(endpoint, formData) {
         // Para upload não setamos Content-Type manualmente (o browser faz isso com boundary)
         const token = localStorage.getItem('token');
