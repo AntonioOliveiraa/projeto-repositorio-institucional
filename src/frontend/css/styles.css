@@ -247,6 +247,32 @@ body {
 .stat-info h3 { font-size: 1.5rem; margin-bottom: 0.25rem; }
 .stat-info p { color: var(--text-muted); font-size: 0.875rem; }
 
+/* Notificações */
+.notif-item {
+    padding: 12px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-unread {
+    background-color: #f0f9ff; /* Azul bem claro para não lidas */
+    border-left: 3px solid var(--primary-color);
+}
+
+.notif-read {
+    background-color: #ffffff;
+    opacity: 0.8;
+}
+
+.notif-item:hover {
+    background-color: #e2e8f0; /* Cinza ao passar o mouse */
+}
+
 /* --- Utilitários --- */
 .hidden {
     display: none !important; /* O !important garante que sobrescreva outros estilos */

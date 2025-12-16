@@ -1,4 +1,5 @@
 import { API } from '../api.js';
+import { verDetalhes } from './documentos.js'; 
 
 export function initNotificacoes() {
     const btn = document.getElementById('btnNotificacoes');
@@ -8,7 +9,7 @@ export function initNotificacoes() {
 
     // Toggle Dropdown
     btn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Evita fechar ao clicar
+        e.stopPropagation();
         dropdown.classList.toggle('hidden');
     });
 
@@ -24,9 +25,11 @@ export function initNotificacoes() {
         try {
             const notifs = await API.get('/notificacoes');
             
-            // Atualiza Badge
-            if (notifs.length > 0) {
-                badge.textContent = notifs.length;
+            // Filtra apenas não lidas para a contagem do Badge
+            const naoLidas = notifs.filter(n => !n.lida).length;
+
+            if (naoLidas > 0) {
+                badge.textContent = naoLidas;
                 badge.style.display = 'block';
             } else {
                 badge.style.display = 'none';
@@ -36,29 +39,53 @@ export function initNotificacoes() {
             if (notifs.length === 0) {
                 lista.innerHTML = '<div style="padding:15px; text-align:center; color:#94a3b8; font-size:0.85rem;">Tudo limpo por aqui!</div>';
             } else {
-                lista.innerHTML = notifs.map(n => `
-                    <div class="notif-item" data-id="${n.id}" style="padding:10px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background 0.2s;">
-                        <div style="font-size:0.85rem; font-weight:600; color:var(--text-main);">${n.mensagem}</div>
-                        <div style="font-size:0.75rem; color:var(--primary-color);">Ref: ${n.numero_protocolo || 'Geral'}</div>
-                        <div style="font-size:0.7rem; color:#94a3b8; margin-top:4px;">${new Date(n.data_hora).toLocaleString()}</div>
+                lista.innerHTML = notifs.map(n => {
+                    // Estilo visual diferente para lidas e não lidas
+                    const bgClass = n.lida ? 'notif-read' : 'notif-unread';
+                    const iconStatus = n.lida ? '<i class="ph ph-check" style="color:#10b981"></i>' : '<i class="ph ph-circle-fill" style="color:var(--primary-color); font-size:0.6rem;"></i>';
+                    
+                    return `
+                    <div class="notif-item ${bgClass}" data-id="${n.id}" data-doc-id="${n.documento_id}" data-lida="${n.lida}">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div style="font-size:0.85rem; font-weight:${n.lida ? '400' : '600'}; color:var(--text-main); flex:1;">
+                                ${n.mensagem}
+                            </div>
+                            <div style="margin-left:10px;">${iconStatus}</div>
+                        </div>
+                        <div style="font-size:0.75rem; color:var(--primary-color); margin-top:2px;">
+                            Ref: ${n.numero_protocolo || 'Geral'}
+                        </div>
+                        <div style="font-size:0.7rem; color:#94a3b8; margin-top:4px;">
+                            ${new Date(n.data_hora).toLocaleString()}
+                        </div>
                     </div>
-                `).join('');
+                `}).join('');
 
-                // Adicionar evento de marcar como lida ao clicar
+                // Adicionar eventos
                 document.querySelectorAll('.notif-item').forEach(item => {
                     item.addEventListener('click', async () => {
                         const id = item.dataset.id;
-                        await API.put(`/notificacoes/${id}/ler`, {});
-                        // Recarrega lista e remove visualmente
-                        carregarNotificacoes();
-                        
-                        // Opcional: Redirecionar para o documento se tiver ID
-                        // window.location.hash = ...
+                        const docId = item.dataset.docId;
+                        const isLida = item.dataset.lida === '1';
+
+                        // 1. Abre o modal de detalhes do documento (Fluxo Lógico)
+                        if (docId && docId !== 'null') {
+                            verDetalhes(docId);
+                            // Esconde o dropdown para limpar a visão
+                            dropdown.classList.add('hidden');
+                        }
+
+                        // 2. Marca como lida no backend (se ainda não for)
+                        if (!isLida) {
+                            try {
+                                await API.put(`/notificacoes/${id}/ler`, {});
+                                // Recarrega para atualizar o badge e o estilo visual
+                                carregarNotificacoes();
+                            } catch (error) {
+                                console.error('Erro ao marcar notificação', error);
+                            }
+                        }
                     });
-                    
-                    // Efeito hover via JS inline para simplificar css
-                    item.onmouseover = () => item.style.background = '#f8fafc';
-                    item.onmouseout = () => item.style.background = 'transparent';
                 });
             }
 
@@ -67,7 +94,6 @@ export function initNotificacoes() {
         }
     };
 
-    // Primeira carga
     carregarNotificacoes();
 
     // Polling: Verifica a cada 15 segundos

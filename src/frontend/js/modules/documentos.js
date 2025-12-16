@@ -213,7 +213,7 @@ export function setupNovoDocumento() {
 }
 
 // Detalhes (Mantido)
-async function verDetalhes(id) {
+export async function verDetalhes(id) {
     try {
         const doc = await API.get(`/documentos/${id}`);
         let extrasHtml = '';
