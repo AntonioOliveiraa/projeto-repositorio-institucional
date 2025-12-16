@@ -175,11 +175,13 @@ body {
 .badge.analise { background: #fef3c7; color: #92400e; }
 .badge.finalizado { background: #d1fae5; color: #065f46; }
 
-/* --- Botões de Ícone (Ações e Fechar) --- */
+/* --- Estilização de Botões de Ícone (Ações e Fechar) --- */
 
 /* Base para botões de ícone (X e Ações da Tabela) 
    EXCETO o botão 'Cancelar' (que tem a classe .btn-secondary) */
-.btn-icon, .close-custom, .close-modal:not(.btn-secondary) {
+.btn-icon, 
+.close-custom:not(.btn-secondary), 
+.close-modal:not(.btn-secondary) {
     background: transparent;
     border: none;
     cursor: pointer;
@@ -194,7 +196,9 @@ body {
 }
 
 /* Hover Geral */
-.btn-icon:hover, .close-custom:hover, .close-modal:not(.btn-secondary):hover {
+.btn-icon:hover, 
+.close-custom:not(.btn-secondary):hover, 
+.close-modal:not(.btn-secondary):hover {
     background-color: #f1f5f9;
     transform: translateY(-2px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -205,20 +209,24 @@ body {
 .btn-editar:hover { color: #d97706; background-color: #fffbeb; }
 .btn-tramitar:hover { color: #059669; background-color: #ecfdf5; }
 .btn-arquivar:hover { color: var(--danger); background-color: #fef2f2; }
+.btn-editar-usuario:hover { color: #7c3aed; background-color: #f5f3ff; } /* Roxo para usuários */
+.btn-excluir-usuario:hover { color: var(--danger); background-color: #fef2f2; }
 
 /* --- Botão de Fechar Modal (X) --- */
 /* Aplica posição absoluta APENAS ao X, ignorando o Cancelar */
-.close-custom, .close-modal:not(.btn-secondary) {
+.close-custom:not(.btn-secondary), 
+.close-modal:not(.btn-secondary) {
     font-size: 1.5rem;
     color: #94a3b8;
     position: absolute; /* Fixa no canto do .modal-card */
     top: 1rem;
     right: 1rem;
-    z-index: 10; /* Garante que fique sobre o header */
+    z-index: 10;
 }
 
 /* Hover específico do X */
-.close-custom:hover, .close-modal:not(.btn-secondary):hover {
+.close-custom:not(.btn-secondary):hover, 
+.close-modal:not(.btn-secondary):hover {
     color: var(--danger);
     background-color: #fee2e2;
     transform: rotate(90deg);
