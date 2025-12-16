@@ -90,7 +90,8 @@ exports.criarDocumento = async (req, res) => {
 };
 
 exports.listarDocumentos = (req, res) => {
-    const { status, categoria, busca } = req.query;
+    // Adicionado setor_id aos parâmetros de consulta
+    const { status, categoria, busca, setor_id } = req.query;
     
     let sql = `
         SELECT d.*, s.nome as nome_setor_atual 
@@ -109,9 +110,13 @@ exports.listarDocumentos = (req, res) => {
         sql += " AND d.categoria = ?";
         params.push(categoria);
     }
-    // --- Busca Abrangente ---
+    // Filtro SQL por Setor
+    if (setor_id) {
+        sql += " AND d.setor_atual_id = ?";
+        params.push(setor_id);
+    }
+
     if (busca) {
-        // Pesquisa em Protocolo, Nome, CPF, Assunto e JSON de Dados Extras
         sql += " AND (d.numero_protocolo LIKE ? OR d.requerente_nome LIKE ? OR d.requerente_cpf LIKE ? OR d.assunto LIKE ? OR d.dados_extras LIKE ?)";
         const termo = `%${busca}%`;
         params.push(termo, termo, termo, termo, termo);
@@ -134,10 +139,11 @@ exports.obterDocumento = (req, res) => {
     // Busca anexos relacionados
     const sqlAnexos = `SELECT * FROM anexo WHERE documento_id = ? ORDER BY data_upload DESC`;
     
+    // Busca histórico de tramitações
     const sqlHist = `SELECT t.*, so.nome as setor_origem, sd.nome as setor_destino, u.nome as usuario_nome FROM tramitacao t JOIN setor so ON t.setor_origem_id = so.id JOIN setor sd ON t.setor_destino_id = sd.id JOIN usuario u ON t.usuario_id = u.id WHERE t.documento_id = ? ORDER BY t.data_hora DESC`;
 
     db.get(sqlDoc, [id], (err, doc) => {
-        if (err || !doc) return res.status(404).json({ erro: "Não encontrado" });
+        if (err || !doc) return res.status(404).json({ erro: "Documento não encontrado" });
         if(doc.dados_extras) { try { doc.dados_extras = JSON.parse(doc.dados_extras); } catch(e) {} }
         
         db.all(sqlAnexos, [id], (errAnx, anexos) => {
@@ -191,12 +197,10 @@ exports.finalizarDocumento = (req, res) => {
     `;
 
     db.serialize(() => {
-        db.run(sqlUpdate, [statusFinal, id], (err) => {
-            if (err) return res.status(500).json({ erro: "Erro ao atualizar status." });
-        });
+        db.run(sqlUpdate, [id]);
         db.run(sqlTramite, [usuario_id, decisao, texto_conclusao, id], (err) => {
-            if (err) return res.status(500).json({ erro: "Erro ao registrar conclusão." });
-            res.json({ mensagem: `Processo finalizado como ${decisao}.` });
+            if (err) return res.status(500).json({ erro: "Erro ao finalizar." });
+            res.json({ mensagem: `Finalizado como ${decisao}.` });
         });
     });
 };

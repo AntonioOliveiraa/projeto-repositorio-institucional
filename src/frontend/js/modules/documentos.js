@@ -8,11 +8,18 @@ import { setupTramitacao } from './tramitacao.js';
 export async function initDocumentos(termoBusca = '') {
     const contentArea = document.getElementById('contentArea');
     
-    // HTML da barra de ferramentas com aviso de filtro
+    // Carrega setores para o filtro
+    let setoresHtml = '<option value="">Todos os Setores</option>';
+    try {
+        const setores = await API.get('/setores');
+        setoresHtml += setores.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+    } catch(e) { console.error('Erro ao carregar setores', e); }
+
+    // HTML da barra de ferramentas com aviso de filtro e novo Select de Setor
     contentArea.innerHTML = `
-        <div class="toolbar" style="display:flex; justify-content:space-between; margin-bottom: 1rem;">
+        <div class="toolbar" style="display:flex; justify-content:space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
             <h2>Gestão de Documentos</h2>
-            <div style="display:flex; gap: 10px;">
+            <div style="display:flex; gap: 10px; flex-wrap: wrap;">
                 ${termoBusca ? `
                     <span class="badge" style="background:#fef3c7; color:#d97706; display:flex; align-items:center; padding:0 10px;">
                         Filtrando por: "${termoBusca}" 
@@ -25,6 +32,11 @@ export async function initDocumentos(termoBusca = '') {
                     <option value="Servidor">Servidores</option>
                     <option value="Academico">Acadêmicos</option>
                 </select>
+
+                <select id="filtroSetor" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+                    ${setoresHtml}
+                </select>
+
                 <select id="filtroStatus" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
                     <option value="">Todos os Status</option>
                     <option value="Recebido">Recebido</option>
@@ -43,9 +55,19 @@ export async function initDocumentos(termoBusca = '') {
     setupEditarDocumento();
     setupAnexarEConcluir();
 
-    // Eventos de mudança nos dropdowns (mantendo o termo de busca se existir)
-    document.getElementById('filtroStatus').addEventListener('change', (e) => carregarDocumentos({ status: e.target.value, busca: termoBusca }));
-    document.getElementById('filtroCategoria').addEventListener('change', (e) => carregarDocumentos({ categoria: e.target.value, busca: termoBusca }));
+    // Eventos de mudança nos dropdowns (Unificados)
+    const onChangeFilter = () => {
+        carregarDocumentos({ 
+            status: document.getElementById('filtroStatus').value, 
+            categoria: document.getElementById('filtroCategoria').value, 
+            setor_id: document.getElementById('filtroSetor').value, // Envia o ID do setor
+            busca: termoBusca 
+        });
+    };
+
+    document.getElementById('filtroStatus').addEventListener('change', onChangeFilter);
+    document.getElementById('filtroCategoria').addEventListener('change', onChangeFilter);
+    document.getElementById('filtroSetor').addEventListener('change', onChangeFilter); // Listener do setor
     
     // Botão "X" para limpar a busca
     const btnLimpar = document.getElementById('btnLimparBadge');
@@ -64,12 +86,14 @@ async function carregarDocumentos(filtros = {}) {
         let qs = '?';
         if(filtros.status) qs += `status=${filtros.status}&`;
         if(filtros.categoria) qs += `categoria=${filtros.categoria}&`;
+        if(filtros.setor_id) qs += `setor_id=${filtros.setor_id}&`; // Adiciona à URL
         if(filtros.busca) qs += `busca=${encodeURIComponent(filtros.busca)}&`;
 
         const docs = await API.get(`/documentos${qs}`);
 
+        // Adicionado 'Setor Atual' na lista de colunas
         UI.renderTable('tabelaDocumentos', 
-            ['Protocolo', 'Categoria', 'Requerente', 'Assunto', 'Status', 'Ações'], 
+            ['Protocolo', 'Categoria', 'Requerente', 'Assunto', 'Setor Atual', 'Status', 'Ações'], 
             docs, 
             (doc) => {
                 // Esconde ações de edição se estiver finalizado
@@ -85,6 +109,7 @@ async function carregarDocumentos(filtros = {}) {
                         <div style="font-size:0.75rem; color:#64748b">Mat: ${doc.requerente_matricula || 'N/A'}</div>
                     </td>
                     <td>${doc.assunto}</td>
+                    <td style="font-size:0.85rem; color:#475569;">${doc.nome_setor_atual || '-'}</td>
                     <td><span class="badge ${getStatusClass(doc.status)}">${doc.status}</span></td>
                     <td class="acoes-col">
                         <button class="btn-icon btn-ver" data-id="${doc.id}" title="Ver Detalhes"><i class="ph ph-eye"></i></button>
