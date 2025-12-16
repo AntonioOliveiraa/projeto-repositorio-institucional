@@ -15,6 +15,9 @@ router.get('/documentos/:id', documentoController.obterDocumento);
 router.put('/documentos/:id', documentoController.editarDocumento);
 router.delete('/documentos/:id', documentoController.arquivarDocumento);
 
+// Pré-análise da IA
+router.post('/ia/analisar', documentoController.analisarAssuntoIA);
+
 // NOVAS ROTAS (Continuidade do fluxo)
 router.post('/documentos/:id/anexo', upload.single('arquivo_extra'), documentoController.anexarArquivo);
 router.put('/documentos/:id/finalizar', documentoController.finalizarDocumento);

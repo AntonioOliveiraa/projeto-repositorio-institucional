@@ -403,3 +403,46 @@ body {
 .notif-item:hover {
     background-color: #f8fafc;
 }
+
+/* --- Tags e IA --- */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 5px;
+    padding: 5px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 6px;
+    min-height: 40px;
+    align-items: center;
+}
+
+.tag-chip {
+    background-color: #e0e7ff;
+    color: #3730a3;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tag-chip i {
+    cursor: pointer;
+    color: #6366f1;
+    font-size: 1rem;
+}
+
+.tag-chip i:hover {
+    color: #dc2626;
+}
+
+.ai-loading {
+    font-size: 0.75rem;
+    color: #d97706;
+    font-style: italic;
+    margin-left: 10px;
+    display: none; /* Oculto por padrão */
+}
