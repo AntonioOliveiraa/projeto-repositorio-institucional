@@ -7,6 +7,7 @@ const documentoController = require('../controllers/documentoController');
 const tramitacaoController = require('../controllers/tramitacaoController');
 const auxiliarController = require('../controllers/auxiliarController');
 const notificacaoController = require('../controllers/notificacaoController');
+const usuarioController = require('../controllers/usuarioController');
 
 // --- Rotas de Documentos ---
 // POST /api/documentos - Cria documento com upload de PDF (RF-001)
@@ -31,6 +32,13 @@ router.post('/tramitar', tramitacaoController.tramitarDocumento);
 // --- Rotas de Notificações (RF-009) ---
 router.get('/notificacoes', notificacaoController.listarNotificacoes);
 router.put('/notificacoes/:id/ler', notificacaoController.marcarComoLida);
+
+// --- Rotas de Gestão de Usuários (CRUD) ---
+router.get('/usuarios-crud', usuarioController.listarUsuarios); // Nome diferente para não conflitar com o auxiliar 'usuarios'
+router.get('/usuarios-crud/:id', usuarioController.obterUsuario);
+router.post('/usuarios-crud', usuarioController.criarUsuario);
+router.put('/usuarios-crud/:id', usuarioController.editarUsuario);
+router.delete('/usuarios-crud/:id', usuarioController.excluirUsuario);
 
 // --- Rotas Auxiliares ---
 router.get('/setores', auxiliarController.listarSetores);

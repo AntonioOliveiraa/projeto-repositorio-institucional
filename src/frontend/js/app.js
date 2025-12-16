@@ -3,6 +3,7 @@ import { initDashboard } from './modules/dashboard.js';
 import { initDocumentos, setupNovoDocumento } from './modules/documentos.js';
 import { initTramitacaoListener } from './modules/tramitacao.js';
 import { initNotificacoes } from './modules/notificacoes.js';
+import { initUsuarios } from './modules/usuarios.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -18,6 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const usuario = JSON.parse(usuarioStr);
+
+    // --- Lógica para mostrar menu de Usuários (APENAS ADMIN) ---
+    if (usuario.perfil === 'Admin') {
+        const menuUsuarios = document.getElementById('menuUsuarios');
+        if (menuUsuarios) menuUsuarios.classList.remove('hidden');
+    }
 
     // 2. Atualizar UI com dados do Usuário
     const userProfileEl = document.querySelector('.user-profile .info');
@@ -92,30 +99,16 @@ document.addEventListener('DOMContentLoaded', () => {
  * @param {string} viewName - Nome da view a ser carregada (ex: 'dashboard', 'documentos')
  */
 function carregarView(viewName) {
-    // Esconde todas as seções de conteúdo
-    const sections = document.querySelectorAll('.view-section');
-    sections.forEach(section => {
-        section.style.display = 'none';
-        section.classList.remove('active');
-    });
+    const title = document.getElementById('pageTitle');
 
-    // Mostra a seção alvo
-    const targetSection = document.getElementById(`view-${viewName}`);
-    if (targetSection) {
-        targetSection.style.display = 'block';
-        targetSection.classList.add('active');
-    } else {
-        console.warn(`View "view-${viewName}" não encontrada no DOM.`);
-    }
-
-    // Lógica específica de carregamento para cada módulo
-    switch(viewName) {
-        case 'dashboard':
-            initDashboard();
-            break;
-        case 'documentos':
-            // initDocumentos pode aceitar filtros se necessário
-            initDocumentos();
-            break;
+    if (viewName === 'dashboard') {
+        title.textContent = 'Visão Geral';
+        initDashboard();
+    } else if (viewName === 'documentos') {
+        title.textContent = 'Gestão de Documentos';
+        initDocumentos();
+    } else if (viewName === 'usuarios') { // <--- NOVA ROTA
+        title.textContent = 'Administração de Usuários';
+        initUsuarios();
     }
 }
